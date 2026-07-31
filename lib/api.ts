@@ -1,0 +1,180 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+
+export const TOKEN_KEY = "mgm_token";
+export const USER_KEY = "mgm_user";
+
+/**
+ * Works out where the backend lives.
+ *
+ * Order of preference:
+ *  1. EXPO_PUBLIC_API_URL — set this in `mgm-frontend/.env` for real devices and
+ *     deployed builds.
+ *  2. The host serving the Expo dev bundle, so a phone on the same Wi-Fi reaches
+ *     your laptop instead of its own loopback. Hardcoding "localhost" meant the
+ *     app only ever worked in a simulator or the web preview.
+ *  3. Platform-appropriate loopback (10.0.2.2 is the host from an Android
+ *     emulator).
+ */
+function resolveBaseUrl(): string {
+    const fromEnv = process.env.EXPO_PUBLIC_API_URL;
+    if (fromEnv) {
+        return `${fromEnv.replace(/\/+$/, "")}/api`;
+    }
+
+    const port = process.env.EXPO_PUBLIC_API_PORT || "3000";
+
+    if (Platform.OS !== "web") {
+        // e.g. "192.168.1.42:8081" while running `expo start`.
+        const hostUri =
+            Constants.expoConfig?.hostUri ??
+            (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
+        const lanHost = hostUri?.split(":")[0];
+
+        if (lanHost && lanHost !== "localhost" && lanHost !== "127.0.0.1") {
+            return `http://${lanHost}:${port}/api`;
+        }
+
+        if (Platform.OS === "android") {
+            return `http://10.0.2.2:${port}/api`;
+        }
+    }
+
+    return `http://localhost:${port}/api`;
+}
+
+export const BASE_URL = resolveBaseUrl();
+
+export async function getAuthToken(): Promise<string | null> {
+    try {
+        return await AsyncStorage.getItem(TOKEN_KEY);
+    } catch {
+        return null;
+    }
+}
+
+/** Thrown for any non-2xx response, carrying the HTTP status for callers. */
+export class ApiError extends Error {
+    status: number;
+    payload: Record<string, unknown>;
+
+    constructor(message: string, status: number, payload: Record<string, unknown> = {}) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.payload = payload;
+    }
+}
+
+/**
+ * Calls the backend and returns the parsed JSON body.
+ *
+ * Pass the expected shape as `T` (see the `*Response` types in lib/types) so
+ * callers get real field checking instead of poking at an untyped object.
+ */
+export async function apiRequest<T = Record<string, unknown>>(
+    endpoint: string,
+    options: RequestInit = {}
+): Promise<T> {
+    const token = await getAuthToken();
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    let response: Response;
+    try {
+        response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+    } catch {
+        // A network-level failure is by far the most common setup problem, so
+        // name the address we tried rather than surfacing "Network request
+        // failed" with no context.
+        throw new ApiError(
+            `Cannot reach the server at ${BASE_URL}. Check that the backend is running and that EXPO_PUBLIC_API_URL is correct.`,
+            0
+        );
+    }
+
+    // Errors from a proxy or a crash may not be JSON at all.
+    let data: Record<string, unknown> = {};
+    const text = await response.text();
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = { error: text.slice(0, 200) };
+        }
+    }
+
+    if (!response.ok) {
+        throw new ApiError(
+            (data.error as string) || `Request failed (HTTP ${response.status})`,
+            response.status,
+            data
+        );
+    }
+
+    return data as T;
+}
+
+const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+export const isCloudinaryConfigured = Boolean(
+    CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET
+);
+
+/**
+ * Uploads a local image URI to Cloudinary and returns the hosted URL.
+ *
+ * The cloud name and (unsigned) upload preset come from the environment — they
+ * used to be hardcoded to a preset borrowed from an unrelated real-estate
+ * project, which meant every build shipped someone else's upload target.
+ */
+export async function uploadImageToCloudinary(uri: string): Promise<string> {
+    if (!isCloudinaryConfigured) {
+        throw new Error(
+            "Image uploads are not configured. Set EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME and EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET in mgm-frontend/.env"
+        );
+    }
+
+    const formData = new FormData();
+
+    if (Platform.OS === "web") {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        formData.append("file", blob, "photo.jpg");
+    } else {
+        formData.append("file", {
+            uri,
+            type: "image/jpeg",
+            name: "photo.jpg",
+        } as unknown as Blob);
+    }
+
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET!);
+
+    const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData }
+    );
+
+    if (!res.ok) {
+        let message = "Cloudinary upload failed";
+        try {
+            const errData = await res.json();
+            message = errData?.error?.message || message;
+        } catch {
+            // Keep the generic message.
+        }
+        throw new Error(message);
+    }
+
+    const data = await res.json();
+    return data.secure_url;
+}
