@@ -7,8 +7,22 @@ import {
     TouchableOpacity,
     RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import { AppNotification, NotificationsResponse } from "@/lib/types";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { EmptyState, IconChip } from "@/components/ui";
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+/** Icon + tint per notification kind, so the type reads at a glance. */
+const NOTIF_STYLES: Record<string, { icon: IoniconName; color: string }> = {
+    complaint_resolved: { icon: "checkmark-done-outline", color: Colors.success },
+    complaint_update: { icon: "sync-outline", color: Colors.primary },
+    new_complaint: { icon: "megaphone-outline", color: Colors.warning },
+    registration_approved: { icon: "shield-checkmark-outline", color: Colors.success },
+    registration_rejected: { icon: "close-circle-outline", color: Colors.error },
+};
 
 export default function NotificationsScreen() {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -50,52 +64,82 @@ export default function NotificationsScreen() {
         }
     };
 
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
+
     return (
         <View style={styles.container}>
-            {notifications.some((n) => !n.isRead) && (
-                <TouchableOpacity style={styles.readAllBtn} onPress={handleReadAll}>
-                    <Text style={styles.readAllText}>✓ Mark All as Read</Text>
-                </TouchableOpacity>
+            {unreadCount > 0 && (
+                <View style={styles.headerBar}>
+                    <Text style={styles.unreadLabel}>
+                        {unreadCount} unread
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.readAllBtn}
+                        onPress={handleReadAll}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="checkmark-done" size={14} color={Colors.primaryDark} />
+                        <Text style={styles.readAllText}>Mark all read</Text>
+                    </TouchableOpacity>
+                </View>
             )}
 
             <FlatList
                 data={notifications}
                 keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadNotifications} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={loadNotifications}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
                 }
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={[styles.notifCard, !item.isRead && styles.unreadCard]}
-                        onPress={() => handleMarkRead(item._id)}
-                    >
-                        <View style={styles.iconCol}>
-                            <Text style={styles.iconText}>
-                                {item.type === "complaint_resolved"
-                                    ? "🎉"
-                                    : item.type === "registration_approved"
-                                    ? "✅"
-                                    : "🔔"}
-                            </Text>
-                        </View>
-                        <View style={styles.textCol}>
-                            <Text style={styles.notifTitle}>{item.title}</Text>
-                            <Text style={styles.notifMessage}>{item.message}</Text>
-                            <Text style={styles.notifDate}>
-                                {new Date(item.createdAt).toLocaleString()}
-                            </Text>
-                        </View>
-                        {!item.isRead && <View style={styles.unreadDot} />}
-                    </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                    const tone = NOTIF_STYLES[item.type] ?? {
+                        icon: "notifications-outline" as IoniconName,
+                        color: Colors.primary,
+                    };
+
+                    return (
+                        <TouchableOpacity
+                            style={[styles.card, !item.isRead && styles.cardUnread]}
+                            onPress={() => handleMarkRead(item._id)}
+                            activeOpacity={item.isRead ? 1 : 0.85}
+                            disabled={item.isRead}
+                        >
+                            <IconChip name={tone.icon} color={tone.color} size={38} />
+
+                            <View style={styles.textCol}>
+                                <Text style={styles.title} numberOfLines={2}>
+                                    {item.title}
+                                </Text>
+                                <Text style={styles.message} numberOfLines={3}>
+                                    {item.message}
+                                </Text>
+                                <Text style={styles.date}>
+                                    {new Date(item.createdAt).toLocaleString("en-IN", {
+                                        day: "numeric",
+                                        month: "short",
+                                        hour: "numeric",
+                                        minute: "2-digit",
+                                    })}
+                                </Text>
+                            </View>
+
+                            {!item.isRead && <View style={styles.unreadDot} />}
+                        </TouchableOpacity>
+                    );
+                }}
                 ListEmptyComponent={
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>🔔</Text>
-                        <Text style={styles.emptyText}>No notifications yet</Text>
-                        <Text style={styles.emptySub}>
-                            You will receive updates here when your complaints are resolved.
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="notifications-outline"
+                        title="No notifications yet"
+                        message="Updates land here when your complaints move forward or get resolved."
+                        style={styles.empty}
+                    />
                 }
             />
         </View>
@@ -105,82 +149,88 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
+        backgroundColor: Colors.background,
     },
-    readAllBtn: {
-        alignSelf: "flex-end",
-        marginBottom: 10,
-    },
-    readAllText: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: "#2563eb",
-    },
-    notifCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
+    headerBar: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 10,
+    },
+    unreadLabel: {
+        fontSize: 11,
+        fontWeight: "700",
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    readAllBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: Radius.full,
+        backgroundColor: Colors.primaryLight,
         borderWidth: 1,
-        borderColor: "#f1f5f9",
+        borderColor: Colors.primaryBorder,
     },
-    unreadCard: {
-        backgroundColor: "#eff6ff",
-        borderColor: "#bfdbfe",
+    readAllText: {
+        fontSize: 11.5,
+        fontWeight: "700",
+        color: Colors.primaryDark,
     },
-    iconCol: {
-        marginRight: 12,
+    listContent: {
+        paddingHorizontal: 16,
+        paddingTop: 6,
+        paddingBottom: 28,
     },
-    iconText: {
-        fontSize: 24,
+    card: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        ...Shadow.sm,
+    },
+    cardUnread: {
+        borderColor: Colors.primaryBorder,
+        backgroundColor: "#FBFDFF",
     },
     textCol: {
         flex: 1,
     },
-    notifTitle: {
-        fontSize: 15,
-        fontWeight: "700",
-        color: "#0f172a",
-        marginBottom: 2,
+    title: {
+        fontSize: 14,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
     },
-    notifMessage: {
-        fontSize: 13,
-        color: "#334155",
+    message: {
+        fontSize: 12.5,
+        color: Colors.textSecondary,
         lineHeight: 18,
+        marginTop: 2,
     },
-    notifDate: {
-        fontSize: 11,
-        color: "#94a3b8",
-        marginTop: 4,
+    date: {
+        fontSize: 10.5,
+        color: Colors.textTertiary,
+        fontWeight: "600",
+        marginTop: 6,
     },
     unreadDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: "#2563eb",
-        marginLeft: 8,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.primary,
     },
-    emptyBox: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 80,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#334155",
-    },
-    emptySub: {
-        fontSize: 13,
-        color: "#64748b",
-        textAlign: "center",
-        marginTop: 4,
+    empty: {
+        marginTop: 60,
     },
 });

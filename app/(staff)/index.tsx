@@ -1,20 +1,21 @@
 import React, { useCallback, useState, useEffect } from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
-    RefreshControl,
-} from "react-native";
-import { useAuth } from "@/context/AuthContext";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { apiRequest } from "@/lib/api";
 import { Complaint, ComplaintsResponse, NotificationsResponse } from "@/lib/types";
 import { ComplaintCard } from "@/components/ComplaintCard";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import {
+    Banner,
+    EmptyState,
+    HowItWorks,
+    Screen,
+    SectionTitle,
+    StatCard,
+} from "@/components/ui";
 
 export default function StaffDashboard() {
-    const { user, logout } = useAuth();
     const router = useRouter();
 
     const [recentComplaints, setRecentComplaints] = useState<Complaint[]>([]);
@@ -48,271 +49,157 @@ export default function StaffDashboard() {
     }, [loadDashboardData]);
 
     return (
-        <ScrollView
-            style={styles.container}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={loadDashboardData} />
-            }
-        >
-            {/* User Greeting Card */}
-            <View style={styles.welcomeCard}>
-                <View style={styles.welcomeTextCol}>
-                    <Text style={styles.greeting}>Welcome back 👋</Text>
-                    <Text style={styles.userName}>{user?.name}</Text>
-                    <Text style={styles.userRole}>Staff • {user?.department || "MGM Faculty"}</Text>
-                </View>
-                <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Quick Action Button */}
+        <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
+            {/* Primary action */}
             <TouchableOpacity
-                style={styles.raiseActionCard}
+                style={styles.actionCard}
                 onPress={() => router.push("/(staff)/raise")}
-                activeOpacity={0.85}
+                activeOpacity={0.9}
             >
-                <View style={styles.actionIconBg}>
-                    <Text style={styles.actionIcon}>📸</Text>
+                <View style={styles.actionIcon}>
+                    <Ionicons name="camera" size={22} color="#FFFFFF" />
                 </View>
-                <View style={styles.actionTextCol}>
-                    <Text style={styles.actionTitle}>Report Infrastructure Damage</Text>
+                <View style={styles.actionText}>
+                    <Text style={styles.actionTitle}>Report damage</Text>
                     <Text style={styles.actionSubtitle}>
-                        Click photo & select Building / Floor / Room (G-1, F-1, Washroom, etc.)
+                        Attach a photo and pick the building, floor and room
                     </Text>
                 </View>
-                <Text style={styles.actionArrow}>→</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
             </TouchableOpacity>
 
-            {/* Stats Row */}
-            <Text style={styles.sectionHeader}>My Maintenance Overview</Text>
-            <View style={styles.statsRow}>
-                <View style={[styles.statBox, { backgroundColor: "#fef3c7" }]}>
-                    <Text style={[styles.statNumber, { color: "#d97706" }]}>{stats.pending}</Text>
-                    <Text style={[styles.statLabel, { color: "#b45309" }]}>Pending</Text>
-                </View>
-                <View style={[styles.statBox, { backgroundColor: "#dbeafe" }]}>
-                    <Text style={[styles.statNumber, { color: "#2563eb" }]}>{stats.in_progress}</Text>
-                    <Text style={[styles.statLabel, { color: "#1e40af" }]}>In Progress</Text>
-                </View>
-                <View style={[styles.statBox, { backgroundColor: "#dcfce7" }]}>
-                    <Text style={[styles.statNumber, { color: "#16a34a" }]}>{stats.resolved}</Text>
-                    <Text style={[styles.statLabel, { color: "#15803d" }]}>Resolved 🎉</Text>
-                </View>
-            </View>
-
-            {/* Surface unread notifications rather than leaving the count unused —
-                this is how staff learn a complaint of theirs was resolved. */}
             {unreadNotifs > 0 && (
-                <TouchableOpacity
-                    style={styles.notifBanner}
+                <Banner
+                    tone="info"
+                    icon="notifications"
+                    title={`${unreadNotifs} unread notification${unreadNotifs === 1 ? "" : "s"}`}
+                    message="Tap to see updates on your complaints."
                     onPress={() => router.push("/(staff)/notifications")}
-                >
-                    <Text style={styles.notifBannerText}>
-                        🔔 You have {unreadNotifs} unread notification
-                        {unreadNotifs === 1 ? "" : "s"}
-                    </Text>
-                    <Text style={styles.notifBannerCta}>View</Text>
-                </TouchableOpacity>
+                />
             )}
 
-            {/* Recent Complaints */}
-            <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionHeader}>Recent Complaints</Text>
-                <TouchableOpacity onPress={() => router.push("/(staff)/complaints")}>
-                    <Text style={styles.seeAllText}>See All</Text>
-                </TouchableOpacity>
+            {/* Orientation — this app is used rarely, so it re-explains itself */}
+            <SectionTitle title="How it works" />
+            <HowItWorks />
+
+            {/* Stats */}
+            <SectionTitle title="My complaints so far" />
+            <View style={styles.statsRow}>
+                <StatCard
+                    icon="time-outline"
+                    color={Colors.warning}
+                    value={stats.pending}
+                    label="Waiting"
+                    layout="stack"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="construct-outline"
+                    color={Colors.primary}
+                    value={stats.in_progress}
+                    label="Being fixed"
+                    layout="stack"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="checkmark-done-outline"
+                    color={Colors.success}
+                    value={stats.resolved}
+                    label="Done"
+                    layout="stack"
+                    style={styles.statCard}
+                />
             </View>
+
+            {/* Recent complaints */}
+            <SectionTitle
+                title="Recent complaints"
+                action={
+                    <TouchableOpacity
+                        onPress={() => router.push("/(staff)/complaints")}
+                        hitSlop={8}
+                        style={styles.seeAll}
+                    >
+                        <Text style={styles.seeAllText}>See all</Text>
+                        <Ionicons name="chevron-forward" size={13} color={Colors.primary} />
+                    </TouchableOpacity>
+                }
+                style={styles.recentTitle}
+            />
 
             {recentComplaints.length === 0 ? (
-                <View style={styles.emptyCard}>
-                    <Text style={styles.emptyIcon}>📦</Text>
-                    <Text style={styles.emptyText}>No complaints raised yet.</Text>
-                    <Text style={styles.emptySub}>
-                        Tap &quot;Report Infrastructure Damage&quot; to submit your first issue.
-                    </Text>
-                </View>
+                <EmptyState
+                    icon="cube-outline"
+                    title="No complaints yet"
+                    message="Tap “Report damage” above to submit your first issue."
+                />
             ) : (
                 recentComplaints.map((item) => (
-                    <ComplaintCard key={item._id} complaint={item} />
+                    <ComplaintCard
+                        key={item._id}
+                        complaint={item}
+                        onPress={() => router.push(`/complaint/${item._id}`)}
+                    />
                 ))
             )}
-        </ScrollView>
+        </Screen>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
-    },
-    welcomeCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 18,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
-    },
-    welcomeTextCol: {
-        flex: 1,
-    },
-    greeting: {
-        fontSize: 13,
-        color: "#64748b",
-        fontWeight: "500",
-    },
-    userName: {
-        fontSize: 20,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginTop: 2,
-    },
-    userRole: {
-        fontSize: 12,
-        color: "#2563eb",
-        fontWeight: "600",
-        marginTop: 2,
-    },
-    logoutBtn: {
-        backgroundColor: "#fee2e2",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    logoutText: {
-        color: "#dc2626",
-        fontSize: 12,
-        fontWeight: "700",
-    },
-    raiseActionCard: {
-        backgroundColor: "#2563eb",
-        borderRadius: 16,
-        padding: 16,
+    actionCard: {
         flexDirection: "row",
         alignItems: "center",
+        gap: 14,
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.xxl,
+        padding: 16,
         marginBottom: 20,
-        elevation: 4,
-    },
-    actionIconBg: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: "rgba(255,255,255,0.2)",
-        justifyContent: "center",
-        alignItems: "center",
-        marginRight: 14,
+        ...Shadow.lg,
     },
     actionIcon: {
-        fontSize: 22,
+        width: 44,
+        height: 44,
+        borderRadius: Radius.lg,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        alignItems: "center",
+        justifyContent: "center",
     },
-    actionTextCol: {
+    actionText: {
         flex: 1,
     },
     actionTitle: {
         fontSize: 16,
         fontWeight: "800",
-        color: "#ffffff",
+        color: "#FFFFFF",
+        letterSpacing: -0.3,
     },
     actionSubtitle: {
-        fontSize: 12,
-        color: "#bfdbfe",
+        fontSize: 11.5,
+        color: "#D5E7F8",
         marginTop: 2,
-    },
-    actionArrow: {
-        fontSize: 22,
-        color: "#ffffff",
-        fontWeight: "700",
-        marginLeft: 8,
-    },
-    sectionHeader: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#1e293b",
-        marginBottom: 10,
-    },
-    notifBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        backgroundColor: "#eff6ff",
-        borderWidth: 1,
-        borderColor: "#bfdbfe",
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 16,
-    },
-    notifBannerText: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#1d4ed8",
-        flex: 1,
-    },
-    notifBannerCta: {
-        fontSize: 13,
-        fontWeight: "800",
-        color: "#1d4ed8",
-    },
-    sectionTitleRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 10,
-        marginBottom: 8,
-    },
-    seeAllText: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: "#2563eb",
+        lineHeight: 16,
     },
     statsRow: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        gap: 10,
-        marginBottom: 20,
+        gap: 8,
+        marginBottom: 22,
     },
-    statBox: {
+    statCard: {
         flex: 1,
-        borderRadius: 14,
-        padding: 14,
-        alignItems: "center",
+        paddingHorizontal: 10,
     },
-    statNumber: {
-        fontSize: 22,
-        fontWeight: "800",
-    },
-    statLabel: {
-        fontSize: 12,
-        fontWeight: "600",
-        marginTop: 2,
-    },
-    emptyCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
-        padding: 30,
-        alignItems: "center",
-        marginVertical: 10,
-    },
-    emptyIcon: {
-        fontSize: 40,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#334155",
-    },
-    emptySub: {
-        fontSize: 13,
-        color: "#64748b",
-        textAlign: "center",
+    recentTitle: {
         marginTop: 4,
+    },
+    seeAll: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 2,
+    },
+    seeAllText: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: Colors.primary,
     },
 });

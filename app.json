@@ -28,6 +28,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow MGM Maintenance to attach photos of campus damage to your complaint.",
+          "cameraPermission": "Allow MGM Maintenance to photograph campus damage for your complaint."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

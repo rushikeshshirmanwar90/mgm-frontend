@@ -5,11 +5,16 @@ import {
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Banner, Button } from "@/components/ui";
 
 export default function VerifyOTPScreen() {
     const { verifyOTP, resendOTP } = useAuth();
@@ -20,6 +25,7 @@ export default function VerifyOTPScreen() {
     const [devOtp, setDevOtp] = useState(params.devOtp);
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
+    const [focused, setFocused] = useState(false);
 
     const handleVerify = async () => {
         if (!otp || otp.length < 6) {
@@ -31,7 +37,7 @@ export default function VerifyOTPScreen() {
         try {
             await verifyOTP(params.email || "", otp);
             Alert.alert(
-                "Email Verified! ✅",
+                "Email Verified",
                 "Your email address has been verified successfully. Your registration has been sent to the Estate Manager for final approval.",
                 [
                     {
@@ -72,160 +78,153 @@ export default function VerifyOTPScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.card}>
-                <Text style={styles.icon}>✉️</Text>
-                <Text style={styles.title}>Verify Email OTP</Text>
-                <Text style={styles.subtitle}>
-                    We sent a 6-digit verification code to:{"\n"}
-                    <Text style={styles.emailText}>{params.email || "your email"}</Text>
-                </Text>
-
-                {devOtp && (
-                    <View style={styles.devBox}>
-                        <Text style={styles.devText}>⚡ Dev Mode Auto OTP: {devOtp}</Text>
+        <SafeAreaView style={styles.safe}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.container}
+            >
+                <View style={styles.card}>
+                    <View style={styles.iconWrap}>
+                        <Ionicons name="mail-open-outline" size={26} color={Colors.primary} />
                     </View>
-                )}
 
-                <TextInput
-                    style={styles.otpInput}
-                    value={otp}
-                    onChangeText={setOtp}
-                    placeholder="123456"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                />
+                    <Text style={styles.title}>Verify your email</Text>
+                    <Text style={styles.subtitle}>
+                        We sent a 6-digit code to{"\n"}
+                        <Text style={styles.emailText}>{params.email || "your email"}</Text>
+                    </Text>
 
-                <TouchableOpacity
-                    style={styles.btn}
-                    onPress={handleVerify}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={styles.btnText}>Verify & Complete Registration</Text>
+                    {devOtp && (
+                        <Banner
+                            tone="warning"
+                            icon="flash"
+                            title={`Dev mode code: ${devOtp}`}
+                            style={styles.devBanner}
+                        />
                     )}
-                </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={styles.resendBtn}
-                    onPress={handleResend}
-                    disabled={resending || loading}
-                >
-                    {resending ? (
-                        <ActivityIndicator color="#2563eb" />
-                    ) : (
-                        <Text style={styles.resendText}>Didn&apos;t get a code? Resend</Text>
-                    )}
-                </TouchableOpacity>
+                    <TextInput
+                        style={[styles.otpInput, focused && styles.otpInputFocused]}
+                        value={otp}
+                        onChangeText={setOtp}
+                        onFocus={() => setFocused(true)}
+                        onBlur={() => setFocused(false)}
+                        placeholder="000000"
+                        placeholderTextColor={Colors.textTertiary}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                    />
 
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.replace("/login")}>
-                    <Text style={styles.backText}>Cancel and return to Login</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
+                    <Button
+                        label="Verify & continue"
+                        icon="checkmark-circle-outline"
+                        size="lg"
+                        fullWidth
+                        loading={loading}
+                        onPress={handleVerify}
+                        style={styles.verifyBtn}
+                    />
+
+                    <Button
+                        label="Didn't get a code? Resend"
+                        variant="secondary"
+                        size="lg"
+                        fullWidth
+                        loading={resending}
+                        disabled={loading}
+                        onPress={handleResend}
+                    />
+
+                    <TouchableOpacity
+                        style={styles.backBtn}
+                        onPress={() => router.replace("/login")}
+                        hitSlop={8}
+                    >
+                        <Text style={styles.backText}>Cancel and return to login</Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safe: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
         padding: 24,
         justifyContent: "center",
     },
     card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 20,
-        padding: 28,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xxl,
+        padding: 26,
         alignItems: "center",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 5,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        ...Shadow.md,
     },
-    icon: {
-        fontSize: 48,
-        marginBottom: 12,
+    iconWrap: {
+        width: 56,
+        height: 56,
+        borderRadius: Radius.xl,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 16,
     },
     title: {
-        fontSize: 22,
+        fontSize: 21,
         fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 8,
+        color: Colors.textPrimary,
+        letterSpacing: -0.4,
+        marginBottom: 6,
     },
     subtitle: {
-        fontSize: 14,
-        color: "#64748b",
+        fontSize: 13,
+        color: Colors.textSecondary,
         textAlign: "center",
         marginBottom: 20,
         lineHeight: 20,
     },
     emailText: {
         fontWeight: "700",
-        color: "#2563eb",
+        color: Colors.primary,
     },
-    devBox: {
-        backgroundColor: "#fef3c7",
-        padding: 8,
-        borderRadius: 8,
-        marginBottom: 16,
+    devBanner: {
         width: "100%",
-        alignItems: "center",
-    },
-    devText: {
-        fontSize: 12,
-        fontWeight: "700",
-        color: "#d97706",
     },
     otpInput: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 12,
+        backgroundColor: Colors.borderLight,
+        borderRadius: Radius.lg,
         width: "100%",
         paddingVertical: 16,
         textAlign: "center",
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: "800",
-        letterSpacing: 8,
+        letterSpacing: 10,
+        color: Colors.textPrimary,
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
+        borderWidth: 1.5,
+        borderColor: Colors.border,
     },
-    btn: {
-        backgroundColor: "#2563eb",
-        borderRadius: 12,
-        paddingVertical: 14,
-        width: "100%",
-        alignItems: "center",
-        marginBottom: 12,
+    otpInputFocused: {
+        borderColor: Colors.primary,
+        backgroundColor: "#F0F9FF",
     },
-    btnText: {
-        color: "#ffffff",
-        fontSize: 15,
-        fontWeight: "700",
-    },
-    resendBtn: {
-        paddingVertical: 10,
-        width: "100%",
-        alignItems: "center",
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "#bfdbfe",
-        backgroundColor: "#eff6ff",
-        marginBottom: 8,
-    },
-    resendText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#2563eb",
+    verifyBtn: {
+        marginBottom: 10,
     },
     backBtn: {
-        paddingVertical: 8,
+        paddingVertical: 12,
+        marginTop: 4,
     },
     backText: {
-        fontSize: 13,
-        color: "#64748b",
+        fontSize: 12.5,
+        color: Colors.textTertiary,
+        fontWeight: "500",
     },
 });

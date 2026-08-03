@@ -2,17 +2,19 @@ import React, { useState } from "react";
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
     Alert,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Banner, Button, TextField } from "@/components/ui";
 
 export default function RegisterScreen() {
     const { register } = useAuth();
@@ -43,7 +45,7 @@ export default function RegisterScreen() {
             const res = await register({ name, email, password, department, phone });
 
             Alert.alert(
-                res.emailSent ? "OTP Sent 📧" : "Account Created ⚠️",
+                res.emailSent ? "OTP Sent" : "Account Created",
                 res.message ||
                     "Registration initiated! Please enter the OTP sent to your email to verify.",
                 [
@@ -68,161 +70,158 @@ export default function RegisterScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-        >
-            <ScrollView contentContainerStyle={styles.container}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-                    <Text style={styles.backText}>← Back to Login</Text>
-                </TouchableOpacity>
-
-                <View style={styles.card}>
-                    <Text style={styles.title}>Staff Sign Up 📝</Text>
-                    <Text style={styles.subtitle}>
-                        Register to report maintenance & infrastructure damage in MGM College campus.
-                    </Text>
-
-                    <Text style={styles.label}>Full Name *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="e.g. Prof. Sharma"
-                    />
-
-                    <Text style={styles.label}>Email Address *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder="e.g. sharma@mgm.edu"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-
-                    <Text style={styles.label}>Password *</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="At least 6 characters"
-                        secureTextEntry
-                    />
-
-                    <Text style={styles.label}>Department (Optional)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={department}
-                        onChangeText={setDepartment}
-                        placeholder="e.g. Mechanical Dept / Science Dept"
-                    />
-
-                    <Text style={styles.label}>Phone Number (Optional)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={phone}
-                        onChangeText={setPhone}
-                        placeholder="e.g. 9876543210"
-                        keyboardType="phone-pad"
-                    />
-
-                    <View style={styles.noticeBox}>
-                        <Text style={styles.noticeText}>
-                            ℹ️ After email OTP verification, your registration will be reviewed by the Estate Manager before login access is activated.
-                        </Text>
-                    </View>
-
+        <SafeAreaView style={styles.safe}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.flex}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.container}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <TouchableOpacity
-                        style={styles.btn}
-                        onPress={handleRegister}
-                        disabled={loading}
+                        style={styles.backBtn}
+                        onPress={() => router.back()}
+                        hitSlop={8}
                     >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.btnText}>Register Account</Text>
-                        )}
+                        <Ionicons name="arrow-back" size={16} color={Colors.primary} />
+                        <Text style={styles.backText}>Back to login</Text>
                     </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+
+                    <View style={styles.card}>
+                        <View style={styles.iconWrap}>
+                            <Ionicons name="person-add" size={22} color={Colors.primary} />
+                        </View>
+
+                        <Text style={styles.title}>Staff sign up</Text>
+                        <Text style={styles.subtitle}>
+                            Register to report maintenance and infrastructure damage across the
+                            MGM College campus.
+                        </Text>
+
+                        <TextField
+                            label="Full name"
+                            icon="person-outline"
+                            value={name}
+                            onChangeText={setName}
+                            placeholder="e.g. Prof. Sharma"
+                        />
+
+                        <TextField
+                            label="Email address"
+                            icon="mail-outline"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="sharma@mgm.edu"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+
+                        <TextField
+                            label="Password"
+                            icon="lock-closed-outline"
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="At least 6 characters"
+                            isPassword
+                            autoCapitalize="none"
+                        />
+
+                        <TextField
+                            label="Department"
+                            hint="optional"
+                            icon="school-outline"
+                            value={department}
+                            onChangeText={setDepartment}
+                            placeholder="e.g. Mechanical Dept"
+                        />
+
+                        <TextField
+                            label="Phone number"
+                            hint="optional"
+                            icon="call-outline"
+                            value={phone}
+                            onChangeText={setPhone}
+                            placeholder="9876543210"
+                            keyboardType="phone-pad"
+                        />
+
+                        <Banner
+                            tone="info"
+                            title="Approval required"
+                            message="After email verification, the Estate Manager reviews your registration before login access is activated."
+                        />
+
+                        <Button
+                            label="Create account"
+                            icon="arrow-forward"
+                            iconAfter
+                            size="lg"
+                            fullWidth
+                            loading={loading}
+                            onPress={handleRegister}
+                        />
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safe: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    flex: {
+        flex: 1,
+    },
     container: {
         flexGrow: 1,
-        backgroundColor: "#f8fafc",
         padding: 24,
         justifyContent: "center",
     },
     backBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        alignSelf: "flex-start",
         marginBottom: 16,
     },
     backText: {
-        fontSize: 14,
-        color: "#2563eb",
-        fontWeight: "600",
+        fontSize: 13,
+        color: Colors.primary,
+        fontWeight: "700",
     },
     card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 18,
-        padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xxl,
+        padding: 22,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        ...Shadow.md,
+    },
+    iconWrap: {
+        width: 46,
+        height: 46,
+        borderRadius: Radius.lg,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 14,
     },
     title: {
-        fontSize: 22,
+        fontSize: 21,
         fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 6,
+        color: Colors.textPrimary,
+        letterSpacing: -0.4,
     },
     subtitle: {
-        fontSize: 13,
-        color: "#64748b",
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
-        marginBottom: 6,
-    },
-    input: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 15,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: "#e2e8f0",
-    },
-    noticeBox: {
-        backgroundColor: "#eff6ff",
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 16,
-    },
-    noticeText: {
-        fontSize: 12,
-        color: "#1d4ed8",
-        lineHeight: 16,
-    },
-    btn: {
-        backgroundColor: "#2563eb",
-        borderRadius: 10,
-        paddingVertical: 14,
-        alignItems: "center",
-        marginTop: 6,
-    },
-    btnText: {
-        color: "#ffffff",
-        fontSize: 16,
-        fontWeight: "700",
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        marginTop: 5,
+        marginBottom: 22,
+        lineHeight: 18,
     },
 });

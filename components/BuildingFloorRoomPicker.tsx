@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    ScrollView,
-    ActivityIndicator,
-} from "react-native";
-import { Building, BuildingsResponse, Floor, FloorsResponse, Room, RoomsResponse } from "@/lib/types";
+    Building,
+    BuildingsResponse,
+    Floor,
+    FloorsResponse,
+    Room,
+    RoomsResponse,
+} from "@/lib/types";
 import { apiRequest } from "@/lib/api";
+import { Colors, Radius } from "@/constants/theme";
+import { ChipGroup } from "./ui/Chip";
 
 interface BuildingFloorRoomPickerProps {
     selectedBuildingId: string | null;
@@ -18,6 +21,36 @@ interface BuildingFloorRoomPickerProps {
     onSelectFloor: (floor: Floor) => void;
     onSelectRoom: (room: Room | null) => void;
 }
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+const ROOM_ICONS: Record<string, IoniconName> = {
+    washroom: "water-outline",
+    lab: "flask-outline",
+    office: "briefcase-outline",
+    library: "library-outline",
+    classroom: "school-outline",
+};
+
+/** Numbered step header: index bubble, title, and a done tick once chosen. */
+const Step: React.FC<{
+    index: number;
+    title: string;
+    optional?: boolean;
+    done: boolean;
+}> = ({ index, title, optional, done }) => (
+    <View style={styles.stepRow}>
+        <View style={[styles.stepBubble, done && styles.stepBubbleDone]}>
+            {done ? (
+                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+            ) : (
+                <Text style={styles.stepNumber}>{index}</Text>
+            )}
+        </View>
+        <Text style={styles.stepTitle}>{title}</Text>
+        {optional && <Text style={styles.stepOptional}>optional</Text>}
+    </View>
+);
 
 export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = ({
     selectedBuildingId,
@@ -92,95 +125,95 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
         }
     };
 
+    const spinner = <ActivityIndicator color={Colors.primary} style={styles.spinner} />;
+
     return (
-        <View style={styles.container}>
-            {/* 1. Select Building */}
-            <Text style={styles.sectionTitle}>1. Select Building *</Text>
+        <View>
+            {/* 1. Building */}
+            <Step index={1} title="Building" done={!!selectedBuildingId} />
             {loadingBuildings ? (
-                <ActivityIndicator color="#2563eb" style={{ marginVertical: 10 }} />
+                spinner
+            ) : buildings.length === 0 ? (
+                <Text style={styles.emptyText}>No buildings configured yet.</Text>
             ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                    {buildings.map((b) => {
-                        const isSelected = selectedBuildingId === b._id;
-                        return (
-                            <TouchableOpacity
-                                key={b._id}
-                                style={[styles.chip, isSelected && styles.selectedChip]}
-                                onPress={() => onSelectBuilding(b)}
-                            >
-                                <Text style={[styles.chipText, isSelected && styles.selectedChipText]}>
-                                    🏢 {b.name} ({b.code})
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+                <ChipGroup
+                    options={buildings.map((b) => ({
+                        key: b._id,
+                        label: `${b.name} · ${b.code}`,
+                        icon: "business-outline" as IoniconName,
+                    }))}
+                    value={selectedBuildingId ?? ""}
+                    onChange={(id) => {
+                        const building = buildings.find((b) => b._id === id);
+                        if (building) onSelectBuilding(building);
+                    }}
+                    style={styles.chipRow}
+                />
             )}
 
-            {/* 2. Select Floor */}
+            {/* 2. Floor */}
             {selectedBuildingId && (
                 <>
-                    <Text style={styles.sectionTitle}>2. Select Floor *</Text>
+                    <Step index={2} title="Floor" done={!!selectedFloorId} />
                     {loadingFloors ? (
-                        <ActivityIndicator color="#2563eb" style={{ marginVertical: 10 }} />
+                        spinner
                     ) : floors.length === 0 ? (
-                        <Text style={styles.emptyText}>No floors added yet for this building.</Text>
+                        <Text style={styles.emptyText}>
+                            No floors added yet for this building.
+                        </Text>
                     ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                            {floors.map((f) => {
-                                const isSelected = selectedFloorId === f._id;
-                                return (
-                                    <TouchableOpacity
-                                        key={f._id}
-                                        style={[styles.chip, isSelected && styles.selectedChip]}
-                                        onPress={() => onSelectFloor(f)}
-                                    >
-                                        <Text style={[styles.chipText, isSelected && styles.selectedChipText]}>
-                                            📶 {f.name} (Prefix: {f.prefix})
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
+                        <ChipGroup
+                            options={floors.map((f) => ({
+                                key: f._id,
+                                label: `${f.name} · ${f.prefix}`,
+                                icon: "layers-outline" as IoniconName,
+                            }))}
+                            value={selectedFloorId ?? ""}
+                            onChange={(id) => {
+                                const floor = floors.find((f) => f._id === id);
+                                if (floor) onSelectFloor(floor);
+                            }}
+                            style={styles.chipRow}
+                        />
                     )}
                 </>
             )}
 
-            {/* 3. Select Classroom / Washroom / Room */}
+            {/* 3. Room */}
             {selectedFloorId && (
                 <>
-                    <Text style={styles.sectionTitle}>3. Select Classroom / Washroom (Optional)</Text>
+                    <Step index={3} title="Room" optional done={!!selectedRoomId} />
                     {loadingRooms ? (
-                        <ActivityIndicator color="#2563eb" style={{ marginVertical: 10 }} />
+                        spinner
                     ) : rooms.length === 0 ? (
-                        <Text style={styles.emptyText}>No specific rooms listed for this floor.</Text>
+                        <Text style={styles.emptyText}>
+                            No specific rooms listed for this floor.
+                        </Text>
                     ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-                            <TouchableOpacity
-                                style={[styles.chip, !selectedRoomId && styles.selectedChip]}
-                                onPress={() => onSelectRoom(null)}
-                            >
-                                <Text style={[styles.chipText, !selectedRoomId && styles.selectedChipText]}>
-                                    Entire Floor / General
-                                </Text>
-                            </TouchableOpacity>
-
-                            {rooms.map((r) => {
-                                const isSelected = selectedRoomId === r._id;
-                                const icon = r.roomType === "washroom" ? "🚽" : r.roomType === "lab" ? "🧪" : "🚪";
-                                return (
-                                    <TouchableOpacity
-                                        key={r._id}
-                                        style={[styles.chip, isSelected && styles.selectedChip]}
-                                        onPress={() => onSelectRoom(r)}
-                                    >
-                                        <Text style={[styles.chipText, isSelected && styles.selectedChipText]}>
-                                            {icon} {r.roomNumber} - {r.name || r.roomType}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
+                        <ChipGroup
+                            options={[
+                                {
+                                    key: "__general__",
+                                    label: "Entire floor",
+                                    icon: "expand-outline" as IoniconName,
+                                },
+                                ...rooms.map((r) => ({
+                                    key: r._id,
+                                    label: `${r.roomNumber} · ${r.name || r.roomType}`,
+                                    icon: ROOM_ICONS[r.roomType] ?? ("cube-outline" as IoniconName),
+                                })),
+                            ]}
+                            value={selectedRoomId ?? "__general__"}
+                            onChange={(id) => {
+                                if (id === "__general__") {
+                                    onSelectRoom(null);
+                                    return;
+                                }
+                                const room = rooms.find((r) => r._id === id);
+                                if (room) onSelectRoom(room);
+                            }}
+                            style={styles.chipRow}
+                        />
                     )}
                 </>
             )}
@@ -189,45 +222,54 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
 };
 
 const styles = StyleSheet.create({
-    container: {
-        marginVertical: 10,
+    stepRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginTop: 16,
+        marginBottom: 10,
     },
-    sectionTitle: {
-        fontSize: 14,
+    stepBubble: {
+        width: 20,
+        height: 20,
+        borderRadius: Radius.full,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    stepBubbleDone: {
+        backgroundColor: Colors.primary,
+    },
+    stepNumber: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: Colors.primaryDark,
+    },
+    stepTitle: {
+        fontSize: 11.5,
         fontWeight: "700",
-        color: "#374151",
-        marginTop: 10,
-        marginBottom: 6,
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+    },
+    stepOptional: {
+        fontSize: 10,
+        fontWeight: "600",
+        color: Colors.textTertiary,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
     },
     chipRow: {
-        flexDirection: "row",
-        marginBottom: 8,
+        marginBottom: 2,
     },
-    chip: {
-        backgroundColor: "#f3f4f6",
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
-    },
-    selectedChip: {
-        backgroundColor: "#2563eb",
-        borderColor: "#1d4ed8",
-    },
-    chipText: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#4b5563",
-    },
-    selectedChipText: {
-        color: "#ffffff",
+    spinner: {
+        alignSelf: "flex-start",
+        marginVertical: 8,
     },
     emptyText: {
-        fontSize: 12,
-        color: "#9ca3af",
+        fontSize: 12.5,
+        color: Colors.textTertiary,
         fontStyle: "italic",
-        marginVertical: 6,
+        marginBottom: 4,
     },
 });

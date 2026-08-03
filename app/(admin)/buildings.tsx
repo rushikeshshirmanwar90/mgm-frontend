@@ -5,12 +5,15 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    TextInput,
     Alert,
     ActivityIndicator,
     Modal,
     RefreshControl,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/api";
 import {
     Building,
@@ -22,8 +25,11 @@ import {
     Room,
     RoomsResponse,
 } from "@/lib/types";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Banner, Button, SectionTitle, TextField } from "@/components/ui";
 
 type RoomType = "classroom" | "washroom" | "lab" | "office";
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 /** Mirrors the backend's default prefix per floor number. */
 function defaultPrefixFor(floorNumber: number): string {
@@ -56,12 +62,12 @@ function defaultNameFor(floorNumber: number): string {
     }
 }
 
-const ROOM_ICONS: Record<string, string> = {
-    washroom: "🚽",
-    lab: "🧪",
-    office: "🗄️",
-    library: "📚",
-    classroom: "🏫",
+const ROOM_ICONS: Record<string, IoniconName> = {
+    washroom: "water-outline",
+    lab: "flask-outline",
+    office: "briefcase-outline",
+    library: "library-outline",
+    classroom: "school-outline",
 };
 
 export default function ManageBuildingsScreen() {
@@ -351,7 +357,7 @@ export default function ManageBuildingsScreen() {
             setRoomModalOpen(false);
             await loadRooms(selectedFloor._id);
             Alert.alert(
-                "Rooms Created 🚪",
+                "Rooms Created",
                 `Created ${res.rooms.map((r) => r.roomNumber).join(", ")}.`
             );
         } catch (e) {
@@ -407,51 +413,56 @@ export default function ManageBuildingsScreen() {
 
     return (
         <ScrollView
-            style={styles.container}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadBuildings} />}
+            style={styles.page}
+            contentContainerStyle={styles.container}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={loadBuildings}
+                    tintColor={Colors.primary}
+                    colors={[Colors.primary]}
+                />
+            }
         >
-            <Text style={styles.headerTitle}>Campus Infrastructure Management 🏢</Text>
-            <Text style={styles.headerSub}>
-                Configure buildings, floors, and classrooms. Rooms are numbered automatically from
-                each floor&apos;s prefix (G-1, G-2, F-1, S-1...).
+            <Text style={styles.intro}>
+                Rooms are numbered automatically from each floor&apos;s prefix — G-1, G-2, F-1, S-1
+                and so on.
             </Text>
 
-            {busy && <ActivityIndicator color="#be185d" style={{ marginBottom: 10 }} />}
+            {busy && <ActivityIndicator color={Colors.primary} style={styles.busy} />}
 
             {/* 1. Buildings */}
-            <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>1. Buildings ({buildings.length})</Text>
-                <TouchableOpacity style={styles.addBtn} onPress={openCreateBuilding}>
-                    <Text style={styles.addBtnText}>+ Add Building</Text>
-                </TouchableOpacity>
-            </View>
+            <SectionTitle
+                title={`Buildings · ${buildings.length}`}
+                action={
+                    <Button label="Add" icon="add" size="sm" onPress={openCreateBuilding} />
+                }
+            />
 
             {buildings.length === 0 ? (
                 <Text style={styles.emptyHint}>
                     No buildings yet. Add one to start mapping the campus.
                 </Text>
             ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tileRow}
+                >
                     {buildings.map((b) => {
                         const isSelected = selectedBuilding?._id === b._id;
                         return (
-                            <View key={b._id} style={[styles.chip, isSelected && styles.selectedChip]}>
-                                <TouchableOpacity onPress={() => setSelectedBuilding(b)}>
-                                    <Text
-                                        style={[styles.chipText, isSelected && styles.selectedChipText]}
-                                    >
-                                        🏢 {b.name} ({b.code})
-                                    </Text>
-                                </TouchableOpacity>
-                                <View style={styles.chipActions}>
-                                    <TouchableOpacity onPress={() => openEditBuilding(b)}>
-                                        <Text style={styles.chipAction}>✏️</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => handleDeleteBuilding(b)}>
-                                        <Text style={styles.chipAction}>🗑️</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
+                            <EntityTile
+                                key={b._id}
+                                icon="business"
+                                title={b.name}
+                                meta={b.code}
+                                selected={isSelected}
+                                onPress={() => setSelectedBuilding(b)}
+                                onEdit={() => openEditBuilding(b)}
+                                onDelete={() => handleDeleteBuilding(b)}
+                            />
                         );
                     })}
                 </ScrollView>
@@ -459,15 +470,13 @@ export default function ManageBuildingsScreen() {
 
             {/* 2. Floors */}
             {selectedBuilding && (
-                <View style={{ marginTop: 20 }}>
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>
-                            2. Floors in {selectedBuilding.code} ({floors.length})
-                        </Text>
-                        <TouchableOpacity style={styles.addBtn} onPress={openCreateFloor}>
-                            <Text style={styles.addBtnText}>+ Add Floor</Text>
-                        </TouchableOpacity>
-                    </View>
+                <View style={styles.section}>
+                    <SectionTitle
+                        title={`Floors in ${selectedBuilding.code} · ${floors.length}`}
+                        action={
+                            <Button label="Add" icon="add" size="sm" onPress={openCreateFloor} />
+                        }
+                    />
 
                     {floors.length === 0 ? (
                         <Text style={styles.emptyHint}>
@@ -477,36 +486,20 @@ export default function ManageBuildingsScreen() {
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            style={styles.chipRow}
+                            contentContainerStyle={styles.tileRow}
                         >
-                            {floors.map((f) => {
-                                const isSelected = selectedFloor?._id === f._id;
-                                return (
-                                    <View
-                                        key={f._id}
-                                        style={[styles.chip, isSelected && styles.selectedChip]}
-                                    >
-                                        <TouchableOpacity onPress={() => setSelectedFloor(f)}>
-                                            <Text
-                                                style={[
-                                                    styles.chipText,
-                                                    isSelected && styles.selectedChipText,
-                                                ]}
-                                            >
-                                                📶 {f.name} ({f.prefix})
-                                            </Text>
-                                        </TouchableOpacity>
-                                        <View style={styles.chipActions}>
-                                            <TouchableOpacity onPress={() => openEditFloor(f)}>
-                                                <Text style={styles.chipAction}>✏️</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleDeleteFloor(f)}>
-                                                <Text style={styles.chipAction}>🗑️</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                );
-                            })}
+                            {floors.map((f) => (
+                                <EntityTile
+                                    key={f._id}
+                                    icon="layers"
+                                    title={f.name}
+                                    meta={`Prefix ${f.prefix}`}
+                                    selected={selectedFloor?._id === f._id}
+                                    onPress={() => setSelectedFloor(f)}
+                                    onEdit={() => openEditFloor(f)}
+                                    onDelete={() => handleDeleteFloor(f)}
+                                />
+                            ))}
                         </ScrollView>
                     )}
                 </View>
@@ -514,15 +507,18 @@ export default function ManageBuildingsScreen() {
 
             {/* 3. Rooms */}
             {selectedFloor && (
-                <View style={{ marginTop: 20, marginBottom: 32 }}>
-                    <View style={styles.sectionHeaderRow}>
-                        <Text style={styles.sectionTitle}>
-                            3. Rooms on {selectedFloor.name} ({rooms.length})
-                        </Text>
-                        <TouchableOpacity style={styles.addBtn} onPress={() => setRoomModalOpen(true)}>
-                            <Text style={styles.addBtnText}>+ Batch Add</Text>
-                        </TouchableOpacity>
-                    </View>
+                <View style={styles.section}>
+                    <SectionTitle
+                        title={`Rooms on ${selectedFloor.name} · ${rooms.length}`}
+                        action={
+                            <Button
+                                label="Batch add"
+                                icon="add"
+                                size="sm"
+                                onPress={() => setRoomModalOpen(true)}
+                            />
+                        }
+                    />
 
                     {rooms.length === 0 ? (
                         <Text style={styles.emptyHint}>No rooms on this floor yet.</Text>
@@ -530,19 +526,37 @@ export default function ManageBuildingsScreen() {
                         <View style={styles.roomsGrid}>
                             {rooms.map((r) => (
                                 <View key={r._id} style={styles.roomCard}>
-                                    <Text style={styles.roomIcon}>
-                                        {ROOM_ICONS[r.roomType] ?? "🚪"}
-                                    </Text>
+                                    <View style={styles.roomIconWrap}>
+                                        <Ionicons
+                                            name={ROOM_ICONS[r.roomType] ?? "cube-outline"}
+                                            size={17}
+                                            color={Colors.primary}
+                                        />
+                                    </View>
                                     <Text style={styles.roomNum}>{r.roomNumber}</Text>
-                                    <Text style={styles.roomTypeLabel} numberOfLines={1}>
+                                    <Text style={styles.roomType} numberOfLines={1}>
                                         {r.name || r.roomType}
                                     </Text>
                                     <View style={styles.roomActions}>
-                                        <TouchableOpacity onPress={() => openEditRoom(r)}>
-                                            <Text style={styles.chipAction}>✏️</Text>
+                                        <TouchableOpacity
+                                            onPress={() => openEditRoom(r)}
+                                            hitSlop={8}
+                                        >
+                                            <Ionicons
+                                                name="create-outline"
+                                                size={15}
+                                                color={Colors.textTertiary}
+                                            />
                                         </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => handleDeleteRoom(r)}>
-                                            <Text style={styles.chipAction}>🗑️</Text>
+                                        <TouchableOpacity
+                                            onPress={() => handleDeleteRoom(r)}
+                                            hitSlop={8}
+                                        >
+                                            <Ionicons
+                                                name="trash-outline"
+                                                size={15}
+                                                color={Colors.error}
+                                            />
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -553,409 +567,509 @@ export default function ManageBuildingsScreen() {
             )}
 
             {/* Building create/edit modal */}
-            <Modal visible={buildingModalOpen} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>
-                            {editingBuilding ? "Edit Building 🏢" : "Add New Building 🏢"}
-                        </Text>
-                        <Text style={styles.label}>Building Name</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={bName}
-                            onChangeText={setBName}
-                            placeholder="e.g. Science Block B"
-                        />
-                        <Text style={styles.label}>Building Code</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={bCode}
-                            onChangeText={setBCode}
-                            placeholder="e.g. SCI-B"
-                            autoCapitalize="characters"
-                        />
-
-                        <View style={styles.btnRow}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setBuildingModalOpen(false)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveBtn}
-                                onPress={handleSaveBuilding}
-                                disabled={busy}
-                            >
-                                <Text style={styles.saveText}>
-                                    {editingBuilding ? "Save Changes" : "Save Building"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            <FormSheet
+                visible={buildingModalOpen}
+                title={editingBuilding ? "Edit building" : "Add building"}
+                subtitle="Buildings group the floors and rooms of your campus."
+                onClose={() => setBuildingModalOpen(false)}
+                onSubmit={handleSaveBuilding}
+                submitLabel={editingBuilding ? "Save changes" : "Create building"}
+                busy={busy}
+            >
+                <TextField
+                    label="Building name"
+                    icon="business-outline"
+                    value={bName}
+                    onChangeText={setBName}
+                    placeholder="e.g. Science Block B"
+                />
+                <TextField
+                    label="Building code"
+                    icon="pricetag-outline"
+                    value={bCode}
+                    onChangeText={setBCode}
+                    placeholder="e.g. SCI-B"
+                    autoCapitalize="characters"
+                />
+            </FormSheet>
 
             {/* Floor create/edit modal */}
-            <Modal visible={floorModalOpen} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>
-                            {editingFloor ? "Edit Floor 📶" : "Add Floor to Building 📶"}
-                        </Text>
-                        <Text style={styles.label}>Floor Name</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={fName}
-                            onChangeText={setFName}
-                            placeholder="e.g. Ground Floor"
-                        />
-                        <Text style={styles.label}>Floor Number (0 = Ground, 1 = First, 2 = Second)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={fNum}
-                            onChangeText={setFNum}
-                            keyboardType="numeric"
-                        />
-                        <Text style={styles.label}>Room Prefix (G for G-1, F for F-1, S for S-1)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={fPrefix}
-                            onChangeText={setFPrefix}
-                            autoCapitalize="characters"
-                        />
+            <FormSheet
+                visible={floorModalOpen}
+                title={editingFloor ? "Edit floor" : "Add floor"}
+                subtitle="The prefix drives automatic room numbering."
+                onClose={() => setFloorModalOpen(false)}
+                onSubmit={handleSaveFloor}
+                submitLabel={editingFloor ? "Save changes" : "Create floor"}
+                busy={busy}
+            >
+                <TextField
+                    label="Floor name"
+                    icon="layers-outline"
+                    value={fName}
+                    onChangeText={setFName}
+                    placeholder="e.g. Ground Floor"
+                />
+                <TextField
+                    label="Floor number"
+                    hint="0 = ground"
+                    icon="swap-vertical-outline"
+                    value={fNum}
+                    onChangeText={setFNum}
+                    keyboardType="numeric"
+                />
+                <TextField
+                    label="Room prefix"
+                    hint="G → G-1"
+                    icon="pricetag-outline"
+                    value={fPrefix}
+                    onChangeText={setFPrefix}
+                    autoCapitalize="characters"
+                />
 
-                        {editingFloor && rooms.length > 0 && (
-                            <Text style={styles.autoNotice}>
-                                ℹ️ The prefix can&apos;t be changed while this floor has rooms — their
-                                numbers would no longer match.
-                            </Text>
-                        )}
-
-                        <View style={styles.btnRow}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setFloorModalOpen(false)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveBtn}
-                                onPress={handleSaveFloor}
-                                disabled={busy}
-                            >
-                                <Text style={styles.saveText}>
-                                    {editingFloor ? "Save Changes" : "Save Floor"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+                {editingFloor && rooms.length > 0 && (
+                    <Banner
+                        tone="info"
+                        title="Prefix is locked"
+                        message="This floor already has rooms — changing the prefix would leave their numbers out of sync."
+                    />
+                )}
+            </FormSheet>
 
             {/* Batch add rooms modal */}
-            <Modal visible={roomModalOpen} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Batch Add Rooms 🚪</Text>
-                        <Text style={styles.label}>Room Type</Text>
-                        <View style={styles.typeSelectorRow}>
-                            {(["classroom", "washroom", "lab", "office"] as const).map((t) => (
-                                <TouchableOpacity
-                                    key={t}
-                                    style={[styles.typeSelChip, rType === t && styles.activeTypeSelChip]}
-                                    onPress={() => setRType(t)}
+            <FormSheet
+                visible={roomModalOpen}
+                title="Batch add rooms"
+                subtitle="Generate a run of rooms in one go."
+                onClose={() => setRoomModalOpen(false)}
+                onSubmit={handleCreateRooms}
+                submitLabel="Generate rooms"
+                busy={busy}
+            >
+                <Text style={styles.fieldLabel}>Room type</Text>
+                <View style={styles.typeRow}>
+                    {(["classroom", "washroom", "lab", "office"] as const).map((t) => {
+                        const active = rType === t;
+                        return (
+                            <TouchableOpacity
+                                key={t}
+                                onPress={() => setRType(t)}
+                                activeOpacity={0.8}
+                                style={[styles.typeChip, active && styles.typeChipActive]}
+                            >
+                                <Ionicons
+                                    name={ROOM_ICONS[t] ?? "cube-outline"}
+                                    size={15}
+                                    color={active ? Colors.primaryDark : Colors.textTertiary}
+                                />
+                                <Text
+                                    style={[
+                                        styles.typeChipText,
+                                        active && styles.typeChipTextActive,
+                                    ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.typeSelText,
-                                            rType === t && styles.activeTypeSelText,
-                                        ]}
-                                    >
-                                        {ROOM_ICONS[t]} {t}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <Text style={styles.label}>Number of Rooms (1–50)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={rCount}
-                            onChangeText={setRCount}
-                            keyboardType="numeric"
-                        />
-
-                        {selectedFloor && (
-                            <Text style={styles.autoNotice}>
-                                ℹ️ Numbering continues from the highest existing room on{" "}
-                                {selectedFloor.name} using the {selectedFloor.prefix} prefix.
-                            </Text>
-                        )}
-
-                        <View style={styles.btnRow}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setRoomModalOpen(false)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
+                                    {t}
+                                </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveBtn}
-                                onPress={handleCreateRooms}
-                                disabled={busy}
-                            >
-                                <Text style={styles.saveText}>Generate Rooms</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                        );
+                    })}
                 </View>
-            </Modal>
+
+                <TextField
+                    label="Number of rooms"
+                    hint="1–50"
+                    icon="calculator-outline"
+                    value={rCount}
+                    onChangeText={setRCount}
+                    keyboardType="numeric"
+                />
+
+                {selectedFloor && (
+                    <Banner
+                        tone="info"
+                        title="Continues existing numbering"
+                        message={`New rooms follow the highest existing number on ${selectedFloor.name}, using the ${selectedFloor.prefix} prefix.`}
+                    />
+                )}
+            </FormSheet>
 
             {/* Edit single room modal */}
-            <Modal visible={editingRoom !== null} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Edit Room 🚪</Text>
-                        <Text style={styles.label}>Room Number</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={erNumber}
-                            onChangeText={setErNumber}
-                            autoCapitalize="characters"
-                        />
-                        <Text style={styles.label}>Display Name</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={erName}
-                            onChangeText={setErName}
-                            placeholder="e.g. Physics Lecture Hall"
-                        />
-
-                        <View style={styles.btnRow}>
-                            <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setEditingRoom(null)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveBtn}
-                                onPress={handleSaveRoom}
-                                disabled={busy}
-                            >
-                                <Text style={styles.saveText}>Save Changes</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            <FormSheet
+                visible={editingRoom !== null}
+                title="Edit room"
+                subtitle="Rename a room or correct its number."
+                onClose={() => setEditingRoom(null)}
+                onSubmit={handleSaveRoom}
+                submitLabel="Save changes"
+                busy={busy}
+            >
+                <TextField
+                    label="Room number"
+                    icon="pricetag-outline"
+                    value={erNumber}
+                    onChangeText={setErNumber}
+                    autoCapitalize="characters"
+                />
+                <TextField
+                    label="Display name"
+                    hint="optional"
+                    icon="text-outline"
+                    value={erName}
+                    onChangeText={setErName}
+                    placeholder="e.g. Physics Lecture Hall"
+                />
+            </FormSheet>
         </ScrollView>
     );
 }
 
+/** Selectable card for a building or floor, with inline edit/delete. */
+const EntityTile: React.FC<{
+    icon: IoniconName;
+    title: string;
+    meta: string;
+    selected: boolean;
+    onPress: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}> = ({ icon, title, meta, selected, onPress, onEdit, onDelete }) => (
+    <View style={[styles.tile, selected && styles.tileSelected]}>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.tileBody}>
+            <View style={[styles.tileIcon, selected && styles.tileIconSelected]}>
+                <Ionicons
+                    name={icon}
+                    size={16}
+                    color={selected ? "#FFFFFF" : Colors.primary}
+                />
+            </View>
+            <View style={styles.tileText}>
+                <Text
+                    style={[styles.tileTitle, selected && styles.tileTitleSelected]}
+                    numberOfLines={1}
+                >
+                    {title}
+                </Text>
+                <Text
+                    style={[styles.tileMeta, selected && styles.tileMetaSelected]}
+                    numberOfLines={1}
+                >
+                    {meta}
+                </Text>
+            </View>
+        </TouchableOpacity>
+
+        <View style={styles.tileActions}>
+            <TouchableOpacity onPress={onEdit} hitSlop={8}>
+                <Ionicons
+                    name="create-outline"
+                    size={15}
+                    color={selected ? "#C5DDF4" : Colors.textTertiary}
+                />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onDelete} hitSlop={8}>
+                <Ionicons
+                    name="trash-outline"
+                    size={15}
+                    color={selected ? "#F8C9C9" : Colors.error}
+                />
+            </TouchableOpacity>
+        </View>
+    </View>
+);
+
+/** Bottom-sheet modal shared by every create/edit form on this screen. */
+const FormSheet: React.FC<{
+    visible: boolean;
+    title: string;
+    subtitle: string;
+    submitLabel: string;
+    busy: boolean;
+    onClose: () => void;
+    onSubmit: () => void;
+    children: React.ReactNode;
+}> = ({ visible, title, subtitle, submitLabel, busy, onClose, onSubmit, children }) => {
+    // Keeps the sheet's action buttons clear of the system navigation area.
+    const insets = useSafeAreaInsets();
+
+    return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.modalOverlay}
+        >
+            <View style={[styles.sheet, { paddingBottom: 22 + insets.bottom }]}>
+                <View style={styles.grabber} />
+
+                <View style={styles.sheetHeader}>
+                    <View style={styles.sheetHeaderText}>
+                        <Text style={styles.sheetTitle}>{title}</Text>
+                        <Text style={styles.sheetSubtitle}>{subtitle}</Text>
+                    </View>
+                    <TouchableOpacity onPress={onClose} hitSlop={10}>
+                        <Ionicons name="close" size={22} color={Colors.textTertiary} />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                    style={styles.sheetBody}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    {children}
+                </ScrollView>
+
+                <View style={styles.sheetActions}>
+                    <Button
+                        label="Cancel"
+                        variant="ghost"
+                        size="lg"
+                        onPress={onClose}
+                        style={styles.sheetActionBtn}
+                    />
+                    <Button
+                        label={submitLabel}
+                        icon="checkmark"
+                        size="lg"
+                        loading={busy}
+                        onPress={onSubmit}
+                        style={styles.sheetActionBtn}
+                    />
+                </View>
+            </View>
+        </KeyboardAvoidingView>
+    </Modal>
+    );
+};
+
 const styles = StyleSheet.create({
+    page: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
     container: {
-        flex: 1,
-        backgroundColor: "#f8fafc",
         padding: 16,
+        paddingBottom: 36,
     },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 4,
+    intro: {
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        lineHeight: 18,
+        marginBottom: 18,
     },
-    headerSub: {
-        fontSize: 13,
-        color: "#64748b",
-        marginBottom: 16,
+    busy: {
+        marginBottom: 12,
     },
-    sectionHeaderRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 10,
-    },
-    sectionTitle: {
-        fontSize: 15,
-        fontWeight: "700",
-        color: "#1e293b",
-        flex: 1,
-    },
-    addBtn: {
-        backgroundColor: "#be185d",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    addBtnText: {
-        color: "#ffffff",
-        fontSize: 12,
-        fontWeight: "700",
+    section: {
+        marginTop: 26,
     },
     emptyHint: {
-        fontSize: 13,
-        color: "#94a3b8",
+        fontSize: 12.5,
+        color: Colors.textTertiary,
         fontStyle: "italic",
-        paddingVertical: 8,
+        paddingVertical: 6,
     },
-    chipRow: {
-        flexDirection: "row",
-        marginBottom: 6,
+    tileRow: {
+        gap: 10,
+        paddingRight: 4,
+        paddingBottom: 4,
     },
-    chip: {
-        backgroundColor: "#ffffff",
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 12,
-        marginRight: 8,
+    tile: {
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.lg,
         borderWidth: 1,
-        borderColor: "#cbd5e1",
+        borderColor: Colors.borderCard,
+        paddingHorizontal: 12,
+        paddingVertical: 11,
+        minWidth: 168,
+        ...Shadow.sm,
     },
-    selectedChip: {
-        backgroundColor: "#be185d",
-        borderColor: "#9d174d",
+    tileSelected: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primaryDark,
     },
-    chipText: {
+    tileBody: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    tileIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    tileIconSelected: {
+        backgroundColor: "rgba(255,255,255,0.22)",
+    },
+    tileText: {
+        flex: 1,
+    },
+    tileTitle: {
         fontSize: 13,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
+    },
+    tileTitleSelected: {
+        color: "#FFFFFF",
+    },
+    tileMeta: {
+        fontSize: 11,
+        color: Colors.textTertiary,
         fontWeight: "600",
-        color: "#334155",
+        marginTop: 1,
     },
-    selectedChipText: {
-        color: "#ffffff",
+    tileMetaSelected: {
+        color: "#C5DDF4",
     },
-    chipActions: {
+    tileActions: {
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 12,
-        marginTop: 6,
-    },
-    chipAction: {
-        fontSize: 14,
+        gap: 14,
+        marginTop: 10,
     },
     roomsGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
         gap: 10,
-        marginTop: 6,
     },
     roomCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 12,
-        padding: 14,
-        width: "30%",
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.lg,
+        padding: 12,
+        width: "31%",
+        flexGrow: 1,
         alignItems: "center",
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: Colors.borderCard,
+        ...Shadow.sm,
     },
-    roomIcon: {
-        fontSize: 24,
-        marginBottom: 4,
+    roomIconWrap: {
+        width: 34,
+        height: 34,
+        borderRadius: 11,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 8,
     },
     roomNum: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: "800",
-        color: "#0f172a",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
     },
-    roomTypeLabel: {
-        fontSize: 11,
-        color: "#64748b",
-        marginTop: 2,
+    roomType: {
+        fontSize: 10.5,
+        color: Colors.textTertiary,
+        marginTop: 1,
+        textTransform: "capitalize",
     },
     roomActions: {
         flexDirection: "row",
-        gap: 14,
-        marginTop: 8,
+        gap: 16,
+        marginTop: 10,
+    },
+    fieldLabel: {
+        fontSize: 11,
+        fontWeight: "700",
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8,
+    },
+    typeRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        marginBottom: 18,
+    },
+    typeChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 9,
+        paddingHorizontal: 12,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.borderLight,
+        borderWidth: 1,
+        borderColor: "transparent",
+        flexGrow: 1,
+        justifyContent: "center",
+    },
+    typeChipActive: {
+        backgroundColor: Colors.primaryLight,
+        borderColor: Colors.primary,
+    },
+    typeChipText: {
+        fontSize: 11.5,
+        fontWeight: "700",
+        color: Colors.textSecondary,
+        textTransform: "capitalize",
+    },
+    typeChipTextActive: {
+        color: Colors.primaryDark,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        padding: 20,
+        backgroundColor: "rgba(15,23,42,0.55)",
+        justifyContent: "flex-end",
     },
-    modalContent: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 20,
+    sheet: {
+        backgroundColor: Colors.surface,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        paddingTop: 10,
+        paddingBottom: 22,
+        maxHeight: "92%",
+        ...Shadow.lg,
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: "800",
-        color: "#0f172a",
+    grabber: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: Colors.border,
+        alignSelf: "center",
         marginBottom: 14,
     },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
-        marginBottom: 4,
-        marginTop: 8,
-    },
-    input: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 14,
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
-    },
-    typeSelectorRow: {
+    sheetHeader: {
         flexDirection: "row",
-        gap: 6,
-        marginVertical: 6,
-    },
-    typeSelChip: {
-        flex: 1,
-        backgroundColor: "#f1f5f9",
-        paddingVertical: 6,
-        borderRadius: 6,
         alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.borderLight,
     },
-    activeTypeSelChip: {
-        backgroundColor: "#be185d",
+    sheetHeaderText: {
+        flex: 1,
     },
-    typeSelText: {
-        fontSize: 10,
-        fontWeight: "600",
-        color: "#475569",
+    sheetTitle: {
+        fontSize: 17,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
     },
-    activeTypeSelText: {
-        color: "#ffffff",
-    },
-    autoNotice: {
+    sheetSubtitle: {
         fontSize: 12,
-        color: "#be185d",
-        backgroundColor: "#fce7f3",
-        padding: 8,
-        borderRadius: 6,
-        marginTop: 10,
+        color: Colors.textSecondary,
+        marginTop: 2,
     },
-    btnRow: {
+    sheetBody: {
+        paddingHorizontal: 20,
+        paddingTop: 18,
+    },
+    sheetActions: {
         flexDirection: "row",
-        justifyContent: "flex-end",
         gap: 10,
-        marginTop: 16,
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
     },
-    cancelBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 8,
-        backgroundColor: "#f1f5f9",
-    },
-    cancelText: {
-        color: "#475569",
-        fontWeight: "600",
-    },
-    saveBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: "#be185d",
-    },
-    saveText: {
-        color: "#ffffff",
-        fontWeight: "700",
+    sheetActionBtn: {
+        flex: 1,
     },
 });

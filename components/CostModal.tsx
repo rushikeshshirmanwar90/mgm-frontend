@@ -3,14 +3,19 @@ import {
     Modal,
     View,
     Text,
-    TextInput,
-    TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
     Alert,
+    ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableOpacity,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/api";
 import { Complaint, CostResponse } from "@/lib/types";
+import { Colors, Radius, Shadow, inr } from "@/constants/theme";
+import { Button, IconChip, TextField } from "./ui";
 
 interface CostModalProps {
     visible: boolean;
@@ -38,6 +43,9 @@ export const CostModal: React.FC<CostModalProps> = ({
     const [otherCost, setOtherCost] = useState(initialOtherCost.toString());
     const [notes, setNotes] = useState(initialNotes);
     const [loading, setLoading] = useState(false);
+    // The sheet sits flush against the bottom edge, so its buttons would fall
+    // under the Android gesture bar without this.
+    const insets = useSafeAreaInsets();
 
     // Re-seed the fields whenever the modal is opened for a (possibly different)
     // complaint. useState alone only captures the first render's props, so
@@ -88,82 +96,113 @@ export const CostModal: React.FC<CostModalProps> = ({
     };
 
     return (
-        <Modal visible={visible} animationType="slide" transparent>
-            <View style={styles.overlay}>
-                <View style={styles.container}>
-                    <Text style={styles.title}>💰 Add / Update Repair Cost</Text>
-                    <Text style={styles.subtitle}>
-                        Enter detailed cost breakdown for labor, materials, and other expenses.
-                    </Text>
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={styles.overlay}
+            >
+                <View style={[styles.sheet, { paddingBottom: 22 + insets.bottom }]}>
+                    <View style={styles.grabber} />
 
-                    <Text style={styles.label}>Labor Cost (₹)</Text>
-                    <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={laborCost}
-                        onChangeText={setLaborCost}
-                        placeholder="e.g. 500"
-                    />
-
-                    <Text style={styles.label}>Material Cost (₹)</Text>
-                    <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={materialCost}
-                        onChangeText={setMaterialCost}
-                        placeholder="e.g. 1200"
-                    />
-
-                    <Text style={styles.label}>Other Cost (₹)</Text>
-                    <TextInput
-                        style={styles.input}
-                        keyboardType="numeric"
-                        value={otherCost}
-                        onChangeText={setOtherCost}
-                        placeholder="e.g. 150"
-                    />
-
-                    <Text style={styles.label}>Notes / Item Details</Text>
-                    <TextInput
-                        style={[styles.input, { height: 60 }]}
-                        multiline
-                        value={notes}
-                        onChangeText={setNotes}
-                        placeholder="e.g. Purchased 2 switches, 1 LED tube light"
-                    />
-
-                    <View style={styles.totalBox}>
-                        <Text style={styles.totalLabel}>Grand Total Cost:</Text>
-                        <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+                    <View style={styles.header}>
+                        <IconChip name="cash-outline" color={Colors.money} size={38} />
+                        <View style={styles.headerText}>
+                            <Text style={styles.title}>Repair Cost</Text>
+                            <Text style={styles.subtitle}>
+                                Break the spend down by labor, materials and other expenses.
+                            </Text>
+                        </View>
+                        <TouchableOpacity onPress={onClose} hitSlop={10} disabled={loading}>
+                            <Ionicons name="close" size={22} color={Colors.textTertiary} />
+                        </TouchableOpacity>
                     </View>
 
-                    {negative && (
-                        <Text style={styles.warningText}>Costs cannot be negative.</Text>
-                    )}
+                    <ScrollView
+                        style={styles.body}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {/* Each field is wrapped so the two share the row evenly;
+                            TextField itself sizes to its content. */}
+                        <View style={styles.costRow}>
+                            <View style={styles.costCol}>
+                                <TextField
+                                    label="Labor"
+                                    icon="hammer-outline"
+                                    keyboardType="numeric"
+                                    value={laborCost}
+                                    onChangeText={setLaborCost}
+                                    placeholder="0"
+                                />
+                            </View>
+                            <View style={styles.costCol}>
+                                <TextField
+                                    label="Material"
+                                    icon="cube-outline"
+                                    keyboardType="numeric"
+                                    value={materialCost}
+                                    onChangeText={setMaterialCost}
+                                    placeholder="0"
+                                />
+                            </View>
+                        </View>
 
-                    <View style={styles.btnRow}>
-                        <TouchableOpacity
-                            style={[styles.btn, styles.cancelBtn]}
+                        <TextField
+                            label="Other expenses"
+                            icon="receipt-outline"
+                            keyboardType="numeric"
+                            value={otherCost}
+                            onChangeText={setOtherCost}
+                            placeholder="0"
+                        />
+
+                        <TextField
+                            label="Notes"
+                            hint="optional"
+                            icon="document-text-outline"
+                            multiline
+                            value={notes}
+                            onChangeText={setNotes}
+                            placeholder="e.g. Purchased 2 switches, 1 LED tube light"
+                        />
+
+                        <View style={styles.totalBox}>
+                            <View>
+                                <Text style={styles.totalLabel}>Grand Total</Text>
+                                <Text style={styles.totalHint}>Labor + material + other</Text>
+                            </View>
+                            <Text style={styles.totalValue}>{inr(total)}</Text>
+                        </View>
+
+                        {negative && (
+                            <View style={styles.warning}>
+                                <Ionicons name="alert-circle" size={15} color={Colors.errorDark} />
+                                <Text style={styles.warningText}>Costs cannot be negative.</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    <View style={styles.actions}>
+                        <Button
+                            label="Cancel"
+                            variant="ghost"
+                            size="lg"
                             onPress={onClose}
                             disabled={loading}
-                        >
-                            <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.btn, styles.saveBtn, negative && styles.disabledBtn]}
+                            style={styles.actionBtn}
+                        />
+                        <Button
+                            label="Save Cost"
+                            icon="checkmark"
+                            size="lg"
                             onPress={handleSave}
-                            disabled={loading || negative}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.saveText}>Save Cost</Text>
-                            )}
-                        </TouchableOpacity>
+                            loading={loading}
+                            disabled={negative}
+                            style={styles.actionBtn}
+                        />
                     </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 };
@@ -171,93 +210,111 @@ export const CostModal: React.FC<CostModalProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        padding: 20,
+        backgroundColor: "rgba(15,23,42,0.55)",
+        justifyContent: "flex-end",
     },
-    container: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 20,
-        elevation: 5,
+    sheet: {
+        backgroundColor: Colors.surface,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        paddingTop: 10,
+        paddingBottom: 22,
+        maxHeight: "92%",
+        ...Shadow.lg,
+    },
+    grabber: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: Colors.border,
+        alignSelf: "center",
+        marginBottom: 14,
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.borderLight,
+    },
+    headerText: {
+        flex: 1,
     },
     title: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: "#111827",
-        marginBottom: 4,
+        fontSize: 17,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
     },
     subtitle: {
-        fontSize: 13,
-        color: "#6b7280",
-        marginBottom: 16,
+        fontSize: 12,
+        color: Colors.textSecondary,
+        marginTop: 2,
+        lineHeight: 16,
     },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#374151",
-        marginBottom: 4,
+    body: {
+        paddingHorizontal: 20,
+        paddingTop: 18,
     },
-    input: {
-        backgroundColor: "#f9fafb",
-        borderWidth: 1,
-        borderColor: "#d1d5db",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 15,
-        marginBottom: 12,
+    costRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    costCol: {
+        flex: 1,
     },
     totalBox: {
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "center",
-        backgroundColor: "#eff6ff",
-        padding: 12,
-        borderRadius: 8,
-        marginVertical: 12,
+        justifyContent: "space-between",
+        backgroundColor: Colors.primaryLight,
+        borderWidth: 1,
+        borderColor: Colors.primaryBorder,
+        borderRadius: Radius.lg,
+        padding: 16,
+        marginTop: 2,
+        marginBottom: 8,
     },
     totalLabel: {
-        fontSize: 15,
+        fontSize: 11,
         fontWeight: "700",
-        color: "#1d4ed8",
+        color: Colors.primaryDark,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    totalHint: {
+        fontSize: 11,
+        color: Colors.primary,
+        marginTop: 2,
     },
     totalValue: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: "800",
-        color: "#1d4ed8",
+        color: Colors.primaryDark,
+        letterSpacing: -0.6,
     },
-    btnRow: {
+    warning: {
         flexDirection: "row",
-        justifyContent: "flex-end",
-        gap: 10,
-    },
-    btn: {
-        paddingVertical: 10,
-        paddingHorizontal: 18,
-        borderRadius: 8,
-    },
-    cancelBtn: {
-        backgroundColor: "#f3f4f6",
-    },
-    cancelText: {
-        color: "#4b5563",
-        fontWeight: "600",
-    },
-    saveBtn: {
-        backgroundColor: "#2563eb",
-    },
-    disabledBtn: {
-        opacity: 0.5,
-    },
-    warningText: {
-        color: "#b91c1c",
-        fontSize: 12,
-        fontWeight: "600",
+        alignItems: "center",
+        gap: 6,
         marginBottom: 10,
     },
-    saveText: {
-        color: "#ffffff",
-        fontWeight: "700",
+    warningText: {
+        color: Colors.errorDark,
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    actions: {
+        flexDirection: "row",
+        gap: 10,
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
+    },
+    actionBtn: {
+        flex: 1,
     },
 });

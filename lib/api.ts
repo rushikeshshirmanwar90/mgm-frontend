@@ -18,7 +18,7 @@ export const USER_KEY = "mgm_user";
  *     emulator).
  */
 function resolveBaseUrl(): string {
-    const fromEnv = process.env.EXPO_PUBLIC_API_URL;
+    const fromEnv = "http://10.149.126.23:3000";
     if (fromEnv) {
         return `${fromEnv.replace(/\/+$/, "")}/api`;
     }

@@ -1,50 +1,58 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { tabIcon, useTabScreenOptions } from "@/components/ui";
 
 export default function AdminLayout() {
     return (
-        <Tabs
-            screenOptions={{
-                headerStyle: { backgroundColor: "#ffffff" },
-                headerTitleStyle: { fontWeight: "700", fontSize: 18 },
-                tabBarActiveTintColor: "#be185d",
-                tabBarInactiveTintColor: "#64748b",
-                tabBarStyle: { height: 60, paddingBottom: 8, paddingTop: 6 },
-            }}
-        >
+        <Tabs screenOptions={useTabScreenOptions()}>
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Executive",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>👑</Text>,
+                    title: "Overview",
+                    tabBarLabel: "Overview",
+                    tabBarIcon: tabIcon("grid"),
                 }}
             />
             <Tabs.Screen
                 name="buildings"
                 options={{
-                    title: "Campus Infrastructure",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏢</Text>,
+                    title: "Buildings & rooms",
+                    tabBarLabel: "Campus",
+                    tabBarIcon: tabIcon("business"),
                 }}
             />
             <Tabs.Screen
                 name="complaints"
                 options={{
-                    title: "Audit & Costs",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>💰</Text>,
+                    title: "All complaints",
+                    // Shortened from "Complaints": the admin bar carries six
+                    // tabs, so the longest label decides whether any of them
+                    // ellipsize on a narrow phone.
+                    tabBarLabel: "Issues",
+                    tabBarIcon: tabIcon("cash"),
                 }}
             />
             <Tabs.Screen
                 name="reports"
                 options={{
-                    title: "Cost Reports",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>📊</Text>,
+                    title: "Spending reports",
+                    tabBarLabel: "Reports",
+                    tabBarIcon: tabIcon("pie-chart"),
                 }}
             />
             <Tabs.Screen
                 name="users"
                 options={{
-                    title: "User Management",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>👥</Text>,
+                    title: "People",
+                    tabBarLabel: "People",
+                    tabBarIcon: tabIcon("people"),
+                }}
+            />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: "My profile",
+                    tabBarLabel: "Profile",
+                    tabBarIcon: tabIcon("person-circle"),
                 }}
             />
         </Tabs>

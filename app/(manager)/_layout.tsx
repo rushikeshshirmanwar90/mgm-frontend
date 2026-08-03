@@ -1,36 +1,39 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { tabIcon, useTabScreenOptions } from "@/components/ui";
 
 export default function ManagerLayout() {
     return (
-        <Tabs
-            screenOptions={{
-                headerStyle: { backgroundColor: "#ffffff" },
-                headerTitleStyle: { fontWeight: "700", fontSize: 18 },
-                tabBarActiveTintColor: "#2563eb",
-                tabBarInactiveTintColor: "#64748b",
-                tabBarStyle: { height: 60, paddingBottom: 8, paddingTop: 6 },
-            }}
-        >
+        <Tabs screenOptions={useTabScreenOptions()}>
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Dashboard",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>📊</Text>,
+                    title: "Overview",
+                    tabBarLabel: "Overview",
+                    tabBarIcon: tabIcon("stats-chart"),
                 }}
             />
             <Tabs.Screen
                 name="complaints"
                 options={{
-                    title: "Manage Complaints",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>🛠️</Text>,
+                    title: "All complaints",
+                    tabBarLabel: "Complaints",
+                    tabBarIcon: tabIcon("construct"),
                 }}
             />
             <Tabs.Screen
                 name="approvals"
                 options={{
-                    title: "Staff Approvals",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>👥</Text>,
+                    title: "New staff requests",
+                    tabBarLabel: "New staff",
+                    tabBarIcon: tabIcon("people"),
+                }}
+            />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: "My profile",
+                    tabBarLabel: "Profile",
+                    tabBarIcon: tabIcon("person-circle"),
                 }}
             />
         </Tabs>

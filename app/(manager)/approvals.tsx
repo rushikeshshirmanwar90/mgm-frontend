@@ -4,13 +4,15 @@ import {
     Text,
     StyleSheet,
     FlatList,
-    TouchableOpacity,
     RefreshControl,
     Alert,
     ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import { User, UsersResponse } from "@/lib/types";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Banner, Button, EmptyState } from "@/components/ui";
 
 export default function StaffApprovalsScreen() {
     const [pendingUsers, setPendingUsers] = useState<User[]>([]);
@@ -84,80 +86,125 @@ export default function StaffApprovalsScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Staff Registrations Pending Approval 👥</Text>
-            <Text style={styles.subtitle}>
-                Review registered staff accounts. Once approved, staff members can log in and submit campus maintenance complaints.
-            </Text>
-
-            {error && (
-                <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            )}
-
             <FlatList
                 data={pendingUsers}
                 keyExtractor={(item) => item._id || item.id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadPendingUsers} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={loadPendingUsers}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+                ListHeaderComponent={
+                    <View>
+                        <Text style={styles.intro}>
+                            Approved staff can log in and submit campus maintenance complaints.
+                        </Text>
+                        {error && <Banner tone="error" title="Could not load" message={error} />}
+                    </View>
                 }
                 renderItem={({ item }) => {
                     const userId = item._id || item.id;
                     const isProcessing = processingId === userId;
 
                     return (
-                        <View style={styles.userCard}>
-                            <View style={styles.userInfoRow}>
-                                <View style={styles.avatarBg}>
+                        <View style={styles.card}>
+                            <View style={styles.topRow}>
+                                <View style={styles.avatar}>
                                     <Text style={styles.avatarText}>
                                         {item.name.charAt(0).toUpperCase()}
                                     </Text>
                                 </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.userName}>{item.name}</Text>
-                                    <Text style={styles.userEmail}>{item.email}</Text>
-                                    {item.department && (
-                                        <Text style={styles.userDept}>Dept: {item.department}</Text>
-                                    )}
+
+                                <View style={styles.identity}>
+                                    <Text style={styles.userName} numberOfLines={1}>
+                                        {item.name}
+                                    </Text>
+                                    <Text style={styles.userEmail} numberOfLines={1}>
+                                        {item.email}
+                                    </Text>
                                 </View>
+                            </View>
+
+                            <View style={styles.metaRow}>
                                 {/* Reflect the real flag — this badge used to be
                                     hardcoded, so it claimed "verified" for every
                                     row regardless of the account's actual state. */}
                                 <View
                                     style={[
-                                        styles.verifiedBadge,
-                                        !item.isEmailVerified && styles.unverifiedBadge,
+                                        styles.badge,
+                                        item.isEmailVerified ? styles.badgeOk : styles.badgeWarn,
                                     ]}
                                 >
+                                    <Ionicons
+                                        name={
+                                            item.isEmailVerified
+                                                ? "checkmark-circle"
+                                                : "alert-circle"
+                                        }
+                                        size={11}
+                                        color={
+                                            item.isEmailVerified
+                                                ? Colors.successDark
+                                                : Colors.warningDark
+                                        }
+                                    />
                                     <Text
                                         style={[
-                                            styles.verifiedText,
-                                            !item.isEmailVerified && styles.unverifiedText,
+                                            styles.badgeText,
+                                            {
+                                                color: item.isEmailVerified
+                                                    ? Colors.successDark
+                                                    : Colors.warningDark,
+                                            },
                                         ]}
                                     >
-                                        {item.isEmailVerified ? "Email Verified ✓" : "Unverified"}
+                                        {item.isEmailVerified ? "Email verified" : "Unverified"}
                                     </Text>
                                 </View>
+
+                                {item.department ? (
+                                    <View style={[styles.badge, styles.badgeNeutral]}>
+                                        <Ionicons
+                                            name="school-outline"
+                                            size={11}
+                                            color={Colors.primaryDark}
+                                        />
+                                        <Text
+                                            style={[styles.badgeText, { color: Colors.primaryDark }]}
+                                            numberOfLines={1}
+                                        >
+                                            {item.department}
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
 
                             <View style={styles.actionRow}>
                                 {isProcessing ? (
-                                    <ActivityIndicator color="#2563eb" />
+                                    <ActivityIndicator
+                                        color={Colors.primary}
+                                        style={styles.actionSpinner}
+                                    />
                                 ) : (
                                     <>
-                                        <TouchableOpacity
-                                            style={[styles.btn, styles.rejectBtn]}
+                                        <Button
+                                            label="Reject"
+                                            icon="close"
+                                            variant="danger"
                                             onPress={() => handleApprove(userId, "reject")}
-                                        >
-                                            <Text style={styles.rejectText}>Reject</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={[styles.btn, styles.approveBtn]}
+                                            style={styles.actionBtn}
+                                        />
+                                        <Button
+                                            label="Approve"
+                                            icon="checkmark"
                                             onPress={() => handleApprove(userId, "approve")}
-                                        >
-                                            <Text style={styles.approveText}>Approve Account ✓</Text>
-                                        </TouchableOpacity>
+                                            style={styles.actionBtn}
+                                        />
                                     </>
                                 )}
                             </View>
@@ -165,11 +212,13 @@ export default function StaffApprovalsScreen() {
                     );
                 }}
                 ListEmptyComponent={
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>🎉</Text>
-                        <Text style={styles.emptyText}>No pending registrations</Text>
-                        <Text style={styles.emptySub}>All staff registrations have been reviewed.</Text>
-                    </View>
+                    <EmptyState
+                        icon="checkmark-done-circle-outline"
+                        title="No pending registrations"
+                        message="All staff registrations have been reviewed."
+                        color={Colors.success}
+                        style={styles.empty}
+                    />
                 }
             />
         </View>
@@ -179,136 +228,99 @@ export default function StaffApprovalsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
+        backgroundColor: Colors.background,
     },
-    title: {
-        fontSize: 18,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 4,
+    listContent: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 28,
     },
-    subtitle: {
-        fontSize: 13,
-        color: "#64748b",
+    intro: {
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        lineHeight: 18,
         marginBottom: 16,
     },
-    userCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
+    card: {
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
         padding: 16,
         marginBottom: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        ...Shadow.md,
     },
-    userInfoRow: {
+    topRow: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 14,
+        gap: 12,
     },
-    avatarBg: {
+    avatar: {
         width: 44,
         height: 44,
-        borderRadius: 22,
-        backgroundColor: "#2563eb",
-        justifyContent: "center",
+        borderRadius: Radius.md,
+        backgroundColor: Colors.primary,
         alignItems: "center",
-        marginRight: 12,
+        justifyContent: "center",
     },
     avatarText: {
-        color: "#ffffff",
+        color: "#FFFFFF",
         fontSize: 18,
         fontWeight: "800",
     },
+    identity: {
+        flex: 1,
+    },
     userName: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#0f172a",
+        fontSize: 15,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
     },
     userEmail: {
-        fontSize: 13,
-        color: "#64748b",
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        marginTop: 1,
     },
-    userDept: {
-        fontSize: 12,
-        color: "#2563eb",
-        fontWeight: "600",
-        marginTop: 2,
+    metaRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 12,
     },
-    verifiedBadge: {
-        backgroundColor: "#dcfce7",
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
+    badge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: Radius.full,
+        maxWidth: "60%",
     },
-    verifiedText: {
-        color: "#166534",
-        fontSize: 11,
+    badgeOk: { backgroundColor: Colors.successLight },
+    badgeWarn: { backgroundColor: Colors.warningLight },
+    badgeNeutral: { backgroundColor: Colors.primaryLight },
+    badgeText: {
+        fontSize: 10.5,
         fontWeight: "700",
-    },
-    unverifiedBadge: {
-        backgroundColor: "#fef3c7",
-    },
-    unverifiedText: {
-        color: "#b45309",
-    },
-    errorBox: {
-        backgroundColor: "#fee2e2",
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 12,
-    },
-    errorText: {
-        color: "#b91c1c",
-        fontSize: 13,
-        fontWeight: "600",
+        flexShrink: 1,
     },
     actionRow: {
         flexDirection: "row",
-        justifyContent: "flex-end",
         gap: 10,
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
     },
-    btn: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 10,
+    actionBtn: {
+        flex: 1,
     },
-    rejectBtn: {
-        backgroundColor: "#fee2e2",
+    actionSpinner: {
+        flex: 1,
+        paddingVertical: 8,
     },
-    rejectText: {
-        color: "#dc2626",
-        fontWeight: "700",
-        fontSize: 13,
-    },
-    approveBtn: {
-        backgroundColor: "#16a34a",
-    },
-    approveText: {
-        color: "#ffffff",
-        fontWeight: "700",
-        fontSize: 13,
-    },
-    emptyBox: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 80,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#334155",
-    },
-    emptySub: {
-        fontSize: 13,
-        color: "#64748b",
-        marginTop: 4,
+    empty: {
+        marginTop: 40,
     },
 });

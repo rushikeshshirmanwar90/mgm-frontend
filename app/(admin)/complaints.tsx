@@ -1,19 +1,26 @@
-import React, { useCallback, useState, useEffect } from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
-    RefreshControl,
-} from "react-native";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
+import { useRouter } from "expo-router";
 import { apiRequest } from "@/lib/api";
 import { Complaint, ComplaintsResponse } from "@/lib/types";
+import { searchComplaints } from "@/lib/complaint-search";
 import { ComplaintCard } from "@/components/ComplaintCard";
+import { Colors, Radius, inr } from "@/constants/theme";
+import { ChipGroup, EmptyState, SearchBar } from "@/components/ui";
+
+const STATUS_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "pending", label: "Pending" },
+    { key: "in_progress", label: "In progress" },
+    { key: "resolved", label: "Resolved" },
+] as const;
 
 export default function AdminComplaintsScreen() {
+    const router = useRouter();
+
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [query, setQuery] = useState("");
     const [refreshing, setRefreshing] = useState(false);
 
     const loadComplaints = useCallback(async () => {
@@ -33,37 +40,79 @@ export default function AdminComplaintsScreen() {
         loadComplaints();
     }, [loadComplaints]);
 
+    const visible = useMemo(
+        () => searchComplaints(complaints, query),
+        [complaints, query]
+    );
+
+    // Summarises whatever is actually on screen, so the number always matches
+    // the list underneath it — including when a search narrows the view.
+    const summary = useMemo(() => {
+        const costed = visible.filter((c) => (c.costDetails?.totalCost || 0) > 0);
+        const total = costed.reduce((sum, c) => sum + (c.costDetails?.totalCost || 0), 0);
+        return { total, costed: costed.length };
+    }, [visible]);
+
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>All Campus Complaints & Cost Audit 💰</Text>
-
-            {/* Filter Row */}
-            <View style={styles.filterRow}>
-                {["all", "pending", "in_progress", "resolved"].map((st) => (
-                    <TouchableOpacity
-                        key={st}
-                        style={[styles.filterChip, statusFilter === st && styles.activeFilterChip]}
-                        onPress={() => setStatusFilter(st)}
-                    >
-                        <Text style={[styles.filterText, statusFilter === st && styles.activeFilterText]}>
-                            {st === "all" ? "All" : st === "in_progress" ? "In Progress" : st.toUpperCase()}
+            <View style={styles.header}>
+                <View style={styles.summaryCard}>
+                    <View>
+                        <Text style={styles.summaryLabel}>Cost in view</Text>
+                        <Text style={styles.summaryMeta}>
+                            {visible.length} complaint{visible.length === 1 ? "" : "s"} ·{" "}
+                            {summary.costed} with a recorded cost
                         </Text>
-                    </TouchableOpacity>
-                ))}
+                    </View>
+                    <Text style={styles.summaryValue}>{inr(summary.total)}</Text>
+                </View>
+
+                <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search by issue, place or reporter"
+                    style={styles.search}
+                />
+
+                <ChipGroup
+                    options={[...STATUS_FILTERS]}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                />
             </View>
 
             <FlatList
-                data={complaints}
+                data={visible}
                 keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadComplaints} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={loadComplaints}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
                 }
-                renderItem={({ item }) => <ComplaintCard complaint={item} showCost />}
+                renderItem={({ item }) => (
+                    <ComplaintCard
+                        complaint={item}
+                        showCost
+                        onPress={() => router.push(`/complaint/${item._id}`)}
+                    />
+                )}
                 ListEmptyComponent={
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>📋</Text>
-                        <Text style={styles.emptyText}>No complaints found</Text>
-                    </View>
+                    <EmptyState
+                        icon={query ? "search-outline" : "document-text-outline"}
+                        title={query ? "No matches" : "No complaints found"}
+                        message={
+                            query
+                                ? `Nothing matches “${query}”.`
+                                : "Nothing matches this filter yet."
+                        }
+                        style={styles.empty}
+                    />
                 }
             />
         </View>
@@ -73,53 +122,51 @@ export default function AdminComplaintsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
+        backgroundColor: Colors.background,
     },
-    title: {
-        fontSize: 18,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 12,
+    header: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
     },
-    filterRow: {
+    summaryCard: {
         flexDirection: "row",
-        gap: 6,
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        backgroundColor: Colors.primaryLight,
+        borderWidth: 1,
+        borderColor: Colors.primaryBorder,
+        borderRadius: Radius.lg,
+        padding: 14,
+        marginBottom: 14,
+    },
+    search: {
         marginBottom: 12,
     },
-    filterChip: {
-        flex: 1,
-        backgroundColor: "#ffffff",
-        paddingVertical: 8,
-        borderRadius: 20,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
-    },
-    activeFilterChip: {
-        backgroundColor: "#be185d",
-        borderColor: "#9d174d",
-    },
-    filterText: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#475569",
-    },
-    activeFilterText: {
-        color: "#ffffff",
-    },
-    emptyBox: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 80,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
+    summaryLabel: {
+        fontSize: 10.5,
         fontWeight: "700",
-        color: "#334155",
+        color: Colors.primaryDark,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    summaryMeta: {
+        fontSize: 11.5,
+        color: Colors.primary,
+        marginTop: 3,
+    },
+    summaryValue: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: Colors.primaryDark,
+        letterSpacing: -0.6,
+    },
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 28,
+    },
+    empty: {
+        marginTop: 40,
     },
 });

@@ -3,23 +3,38 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserRole } from "@/lib/types";
+import { Colors } from "@/constants/theme";
 
 /** Routes reachable without being signed in. */
 const PUBLIC_ROUTES = ["login", "register", "verify-otp"];
 
-/** The route group that owns each role's screens. */
-const HOME_FOR_ROLE: Record<UserRole, string> = {
+/**
+ * The route group that owns each role's screens. Left `as const` rather than
+ * widened to `string` so expo-router's typed-routes check accepts these paths
+ * at the `router.replace` call below.
+ */
+const HOME_FOR_ROLE = {
     admin: "/(admin)",
     manager: "/(manager)",
     staff: "/(staff)",
-};
+} as const satisfies Record<UserRole, string>;
 
 const GROUP_FOR_ROLE: Record<UserRole, string> = {
     admin: "(admin)",
     manager: "(manager)",
     staff: "(staff)",
 };
+
+/**
+ * Signed-in routes that sit outside the per-role groups because every role uses
+ * the same screen. Without this the guard below would treat the complaint detail
+ * route as "wrong group" and bounce anyone who opened a complaint straight back
+ * to their dashboard. Access within these screens is still enforced server-side
+ * (staff can only fetch their own complaints).
+ */
+const SHARED_ROUTES = ["complaint"];
 
 function RootLayoutNav() {
     const { user, isLoading } = useAuth();
@@ -46,21 +61,34 @@ function RootLayoutNav() {
         // Signed in: keep users inside their own role's group, and bounce them
         // out of the public auth screens.
         const home = HOME_FOR_ROLE[user.role];
-        if (current !== GROUP_FOR_ROLE[user.role]) {
+        const onSharedRoute = current !== undefined && SHARED_ROUTES.includes(current);
+        if (current !== GROUP_FOR_ROLE[user.role] && !onSharedRoute) {
             router.replace(home);
         }
     }, [user, isLoading, segments, router]);
 
     if (isLoading) {
         return (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                <ActivityIndicator size="large" color="#2563eb" />
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: Colors.background,
+                }}
+            >
+                <ActivityIndicator size="large" color={Colors.primary} />
             </View>
         );
     }
 
     return (
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+            screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: Colors.background },
+            }}
+        >
             <Stack.Screen name="index" />
             <Stack.Screen name="login" />
             <Stack.Screen name="register" />
@@ -68,15 +96,32 @@ function RootLayoutNav() {
             <Stack.Screen name="(staff)" />
             <Stack.Screen name="(manager)" />
             <Stack.Screen name="(admin)" />
+            <Stack.Screen
+                name="complaint/[id]"
+                options={{
+                    headerShown: true,
+                    title: "Complaint",
+                    headerBackTitle: "Back",
+                    headerStyle: { backgroundColor: Colors.surface },
+                    headerTintColor: Colors.primary,
+                    headerTitleStyle: {
+                        fontWeight: "800",
+                        fontSize: 17,
+                        color: Colors.textPrimary,
+                    },
+                }}
+            />
         </Stack>
     );
 }
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
-            <StatusBar style="dark" />
-            <RootLayoutNav />
-        </AuthProvider>
+        <SafeAreaProvider>
+            <AuthProvider>
+                <StatusBar style="dark" />
+                <RootLayoutNav />
+            </AuthProvider>
+        </SafeAreaProvider>
     );
 }

@@ -1,12 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    RefreshControl,
-    TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import {
     Building,
@@ -14,8 +8,14 @@ import {
     Complaint,
     ComplaintsResponse,
 } from "@/lib/types";
-
-const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+import { Colors, Radius, Shadow, inr } from "@/constants/theme";
+import {
+    ChipGroup,
+    ProgressBar,
+    Screen,
+    SectionTitle,
+    StatCard,
+} from "@/components/ui";
 
 /** Resolves a possibly-populated reference to its display label. */
 function buildingLabel(complaint: Complaint): string | null {
@@ -39,6 +39,12 @@ interface Bucket {
     total: number;
     count: number;
 }
+
+const RANGE_OPTIONS = [
+    { key: "3", label: "3 months" },
+    { key: "6", label: "6 months" },
+    { key: "12", label: "12 months" },
+];
 
 export default function AdminReportsScreen() {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -135,8 +141,7 @@ export default function AdminReportsScreen() {
                 bucket.labor += c.costDetails.laborCost || 0;
                 bucket.material += c.costDetails.materialCost || 0;
                 bucket.other += c.costDetails.otherCost || 0;
-                bucket.total =
-                    bucket.labor + bucket.material + bucket.other;
+                bucket.total = bucket.labor + bucket.material + bucket.other;
             }
         }
 
@@ -153,7 +158,7 @@ export default function AdminReportsScreen() {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const key = `${d.getFullYear()}-${d.getMonth()}`;
             const bucket: Bucket = {
-                label: d.toLocaleString("en-IN", { month: "short", year: "2-digit" }),
+                label: d.toLocaleString("en-IN", { month: "short" }),
                 labor: 0,
                 material: 0,
                 other: 0,
@@ -181,85 +186,96 @@ export default function AdminReportsScreen() {
     }, [complaints, months]);
 
     const trendPeak = Math.max(...monthlyTrend.map((m) => m.total), 1);
+    const buildingPeak = Math.max(...byBuilding.map((b) => b.total), 1);
 
-    const share = (part: number) =>
-        totals.total > 0 ? Math.round((part / totals.total) * 100) : 0;
+    const share = (part: number) => (totals.total > 0 ? (part / totals.total) * 100 : 0);
+
+    const composition = [
+        { label: "Labor", value: totals.labor, color: Colors.primary },
+        { label: "Material", value: totals.material, color: Colors.success },
+        { label: "Other", value: totals.other, color: Colors.warning },
+    ];
 
     return (
-        <ScrollView
-            style={styles.container}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}
-        >
-            <Text style={styles.title}>Maintenance Cost Reports 📊</Text>
-            <Text style={styles.subtitle}>
-                {complaints.length} complaint{complaints.length === 1 ? "" : "s"} on record ·{" "}
-                {totals.costed} with a recorded cost breakdown
-            </Text>
-
-            {/* Grand total */}
+        <Screen scroll refreshing={refreshing} onRefresh={load}>
+            {/* Hero */}
             <View style={styles.heroCard}>
-                <Text style={styles.heroLabel}>Total Maintenance Expenditure</Text>
+                <View style={styles.heroTop}>
+                    <View style={styles.heroIcon}>
+                        <Ionicons name="analytics-outline" size={18} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.heroLabel}>Total maintenance expenditure</Text>
+                </View>
                 <Text style={styles.heroValue}>{inr(totals.total)}</Text>
                 <Text style={styles.heroMeta}>
-                    Average {inr(totals.average)} per costed repair
+                    {complaints.length} complaint{complaints.length === 1 ? "" : "s"} on record ·{" "}
+                    {totals.costed} costed · {inr(totals.average)} average
                 </Text>
             </View>
 
-            {/* Cost composition */}
-            <Text style={styles.sectionTitle}>Cost Composition</Text>
+            {/* Composition */}
+            <SectionTitle title="Cost composition" />
             <View style={styles.card}>
-                {(
-                    [
-                        { label: "Labor", value: totals.labor, color: "#2563eb" },
-                        { label: "Material", value: totals.material, color: "#16a34a" },
-                        { label: "Other", value: totals.other, color: "#d97706" },
-                    ] as const
-                ).map((row) => (
-                    <View key={row.label} style={styles.compositionRow}>
+                {composition.map((row, i) => (
+                    <View
+                        key={row.label}
+                        style={[
+                            styles.compositionRow,
+                            i === composition.length - 1 && styles.lastRow,
+                        ]}
+                    >
                         <View style={styles.compositionHeader}>
-                            <Text style={styles.compositionLabel}>{row.label}</Text>
+                            <View style={styles.legendWrap}>
+                                <View style={[styles.legendDot, { backgroundColor: row.color }]} />
+                                <Text style={styles.compositionLabel}>{row.label}</Text>
+                            </View>
                             <Text style={styles.compositionValue}>
                                 {inr(row.value)}{" "}
-                                <Text style={styles.compositionPct}>({share(row.value)}%)</Text>
+                                <Text style={styles.compositionPct}>
+                                    ({Math.round(share(row.value))}%)
+                                </Text>
                             </Text>
                         </View>
-                        <View style={styles.barTrack}>
-                            <View
-                                style={[
-                                    styles.barFill,
-                                    { width: `${share(row.value)}%`, backgroundColor: row.color },
-                                ]}
-                            />
-                        </View>
+                        <ProgressBar percent={share(row.value)} color={row.color} />
                     </View>
                 ))}
             </View>
 
-            {/* Status split */}
-            <Text style={styles.sectionTitle}>Complaint Status</Text>
+            {/* Status */}
+            <SectionTitle title="Complaint status" />
             <View style={styles.statusGrid}>
-                {(
-                    [
-                        { label: "Pending", value: statusCounts.pending, bg: "#fef3c7", fg: "#b45309" },
-                        {
-                            label: "In Progress",
-                            value: statusCounts.in_progress,
-                            bg: "#dbeafe",
-                            fg: "#1d4ed8",
-                        },
-                        { label: "Resolved", value: statusCounts.resolved, bg: "#dcfce7", fg: "#166534" },
-                        { label: "Rejected", value: statusCounts.rejected, bg: "#fee2e2", fg: "#b91c1c" },
-                    ] as const
-                ).map((s) => (
-                    <View key={s.label} style={[styles.statusBox, { backgroundColor: s.bg }]}>
-                        <Text style={[styles.statusNum, { color: s.fg }]}>{s.value}</Text>
-                        <Text style={styles.statusLabel}>{s.label}</Text>
-                    </View>
-                ))}
+                <StatCard
+                    icon="time-outline"
+                    color={Colors.warning}
+                    value={statusCounts.pending}
+                    label="Pending"
+                    style={styles.statusCard}
+                />
+                <StatCard
+                    icon="construct-outline"
+                    color={Colors.primary}
+                    value={statusCounts.in_progress}
+                    label="In progress"
+                    style={styles.statusCard}
+                />
+                <StatCard
+                    icon="checkmark-done-outline"
+                    color={Colors.success}
+                    value={statusCounts.resolved}
+                    label="Resolved"
+                    style={styles.statusCard}
+                />
+                <StatCard
+                    icon="close-circle-outline"
+                    color={Colors.error}
+                    value={statusCounts.rejected}
+                    label="Rejected"
+                    style={styles.statusCard}
+                />
             </View>
 
-            {/* Building breakdown */}
-            <Text style={styles.sectionTitle}>Spend by Building</Text>
+            {/* Spend by building */}
+            <SectionTitle title="Spend by building" />
             <View style={styles.card}>
                 {byBuilding.length === 0 ? (
                     <Text style={styles.emptyHint}>No buildings configured yet.</Text>
@@ -267,49 +283,56 @@ export default function AdminReportsScreen() {
                     byBuilding.map((b, i) => (
                         <View
                             key={`${b.label}-${i}`}
-                            style={[styles.buildingRow, i === byBuilding.length - 1 && styles.lastRow]}
+                            style={[
+                                styles.buildingRow,
+                                i === byBuilding.length - 1 && styles.lastRow,
+                            ]}
                         >
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.buildingName}>{b.label}</Text>
-                                <Text style={styles.buildingMeta}>
-                                    {b.count} complaint{b.count === 1 ? "" : "s"} · labor{" "}
-                                    {inr(b.labor)} · material {inr(b.material)} · other {inr(b.other)}
-                                </Text>
+                            <View style={styles.buildingHeader}>
+                                <View style={styles.buildingNameWrap}>
+                                    <Ionicons
+                                        name="business-outline"
+                                        size={14}
+                                        color={Colors.primary}
+                                    />
+                                    <Text style={styles.buildingName} numberOfLines={1}>
+                                        {b.label}
+                                    </Text>
+                                </View>
+                                <Text style={styles.buildingTotal}>{inr(b.total)}</Text>
                             </View>
-                            <Text style={styles.buildingTotal}>{inr(b.total)}</Text>
+
+                            <ProgressBar
+                                percent={(b.total / buildingPeak) * 100}
+                                color={Colors.primary}
+                                height={6}
+                            />
+
+                            <Text style={styles.buildingMeta}>
+                                {b.count} complaint{b.count === 1 ? "" : "s"} · labor {inr(b.labor)}{" "}
+                                · material {inr(b.material)} · other {inr(b.other)}
+                            </Text>
                         </View>
                     ))
                 )}
             </View>
 
             {/* Monthly trend */}
-            <View style={styles.trendHeader}>
-                <Text style={styles.sectionTitle}>Monthly Trend</Text>
-                <View style={styles.rangeRow}>
-                    {[3, 6, 12].map((m) => (
-                        <TouchableOpacity
-                            key={m}
-                            style={[styles.rangeChip, months === m && styles.activeRangeChip]}
-                            onPress={() => setMonths(m)}
-                        >
-                            <Text
-                                style={[
-                                    styles.rangeText,
-                                    months === m && styles.activeRangeText,
-                                ]}
-                            >
-                                {m}m
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+            <SectionTitle title="Monthly trend" />
+            <View style={styles.rangeRow}>
+                <ChipGroup
+                    options={RANGE_OPTIONS}
+                    value={String(months)}
+                    onChange={(k) => setMonths(Number(k))}
+                    fill
+                />
             </View>
 
-            <View style={[styles.card, { marginBottom: 40 }]}>
+            <View style={styles.card}>
                 <View style={styles.chartRow}>
                     {monthlyTrend.map((m, i) => (
                         <View key={`${m.label}-${i}`} style={styles.chartCol}>
-                            <Text style={styles.chartValue}>
+                            <Text style={styles.chartValue} numberOfLines={1}>
                                 {m.total > 0 ? inr(m.total).replace("₹", "") : "—"}
                             </Text>
                             <View style={styles.chartBarTrack}>
@@ -329,221 +352,198 @@ export default function AdminReportsScreen() {
                     Bar height = cost recorded that month · bottom number = complaints raised
                 </Text>
             </View>
-        </ScrollView>
+        </Screen>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: "800",
-        color: "#0f172a",
-    },
-    subtitle: {
-        fontSize: 13,
-        color: "#64748b",
-        marginTop: 2,
-        marginBottom: 16,
-    },
     heroCard: {
-        backgroundColor: "#831843",
-        borderRadius: 18,
+        backgroundColor: Colors.primaryDark,
+        borderRadius: Radius.xxl,
         padding: 20,
-        marginBottom: 20,
+        marginBottom: 22,
+        ...Shadow.lg,
+    },
+    heroTop: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    heroIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: Radius.md,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        alignItems: "center",
+        justifyContent: "center",
     },
     heroLabel: {
-        fontSize: 13,
-        color: "#fbcfe8",
-        fontWeight: "600",
+        fontSize: 11,
+        fontWeight: "700",
+        color: "#C5DDF4",
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        flexShrink: 1,
     },
     heroValue: {
         fontSize: 34,
         fontWeight: "800",
-        color: "#ffffff",
-        marginVertical: 4,
+        color: "#FFFFFF",
+        letterSpacing: -1.2,
+        marginTop: 12,
     },
     heroMeta: {
         fontSize: 12,
-        color: "#fbcfe8",
-    },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#1e293b",
-        marginBottom: 10,
+        color: "#C5DDF4",
+        marginTop: 4,
+        lineHeight: 17,
     },
     card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
         padding: 16,
-        marginBottom: 20,
+        marginBottom: 22,
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: Colors.borderCard,
+        ...Shadow.sm,
     },
     compositionRow: {
-        marginBottom: 14,
+        marginBottom: 16,
+    },
+    lastRow: {
+        marginBottom: 0,
     },
     compositionHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 6,
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    legendWrap: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 7,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
     },
     compositionLabel: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
+        fontSize: 12.5,
+        fontWeight: "700",
+        color: Colors.textBody,
     },
     compositionValue: {
         fontSize: 13,
         fontWeight: "800",
-        color: "#0f172a",
+        color: Colors.textPrimary,
     },
     compositionPct: {
         fontSize: 11,
         fontWeight: "600",
-        color: "#94a3b8",
-    },
-    barTrack: {
-        height: 8,
-        backgroundColor: "#f1f5f9",
-        borderRadius: 4,
-        overflow: "hidden",
-    },
-    barFill: {
-        height: "100%",
-        borderRadius: 4,
+        color: Colors.textTertiary,
     },
     statusGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
         gap: 10,
-        marginBottom: 20,
+        marginBottom: 22,
     },
-    statusBox: {
-        width: "48%",
-        borderRadius: 12,
-        padding: 14,
-        alignItems: "center",
-    },
-    statusNum: {
-        fontSize: 22,
-        fontWeight: "800",
-    },
-    statusLabel: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#374151",
-        marginTop: 2,
+    statusCard: {
+        width: "47.5%",
+        flexGrow: 1,
     },
     buildingRow: {
+        marginBottom: 18,
+    },
+    buildingHeader: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f1f5f9",
+        justifyContent: "space-between",
+        gap: 10,
+        marginBottom: 8,
     },
-    lastRow: {
-        borderBottomWidth: 0,
+    buildingNameWrap: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        flexShrink: 1,
     },
     buildingName: {
-        fontSize: 14,
+        fontSize: 13.5,
         fontWeight: "700",
-        color: "#0f172a",
-    },
-    buildingMeta: {
-        fontSize: 11,
-        color: "#64748b",
-        marginTop: 2,
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
+        flexShrink: 1,
     },
     buildingTotal: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: "800",
-        color: "#be185d",
-        marginLeft: 10,
+        color: Colors.primaryDark,
+        letterSpacing: -0.3,
+    },
+    buildingMeta: {
+        fontSize: 10.5,
+        color: Colors.textTertiary,
+        marginTop: 7,
+        lineHeight: 15,
     },
     emptyHint: {
-        fontSize: 13,
-        color: "#94a3b8",
+        fontSize: 12.5,
+        color: Colors.textTertiary,
         fontStyle: "italic",
     },
-    trendHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-    },
     rangeRow: {
-        flexDirection: "row",
-        gap: 6,
-        marginBottom: 10,
-    },
-    rangeChip: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 14,
-        backgroundColor: "#ffffff",
-        borderWidth: 1,
-        borderColor: "#e2e8f0",
-    },
-    activeRangeChip: {
-        backgroundColor: "#be185d",
-        borderColor: "#9d174d",
-    },
-    rangeText: {
-        fontSize: 11,
-        fontWeight: "700",
-        color: "#475569",
-    },
-    activeRangeText: {
-        color: "#ffffff",
+        marginBottom: 14,
     },
     chartRow: {
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "flex-end",
         height: 170,
+        gap: 4,
     },
     chartCol: {
         flex: 1,
         alignItems: "center",
+        height: "100%",
     },
     chartValue: {
-        fontSize: 9,
-        color: "#64748b",
+        fontSize: 8.5,
+        color: Colors.textTertiary,
+        fontWeight: "600",
         marginBottom: 4,
     },
     chartBarTrack: {
         flex: 1,
-        width: 18,
-        backgroundColor: "#f1f5f9",
-        borderRadius: 4,
+        width: 20,
+        backgroundColor: Colors.borderLight,
+        borderRadius: Radius.sm,
         justifyContent: "flex-end",
         overflow: "hidden",
     },
     chartBar: {
         width: "100%",
-        backgroundColor: "#be185d",
-        borderRadius: 4,
-        minHeight: 2,
+        backgroundColor: Colors.primary,
+        borderRadius: Radius.sm,
+        minHeight: 3,
     },
     chartLabel: {
         fontSize: 10,
-        fontWeight: "600",
-        color: "#475569",
-        marginTop: 6,
+        fontWeight: "700",
+        color: Colors.textSecondary,
+        marginTop: 7,
     },
     chartCount: {
-        fontSize: 10,
-        color: "#94a3b8",
+        fontSize: 9.5,
+        color: Colors.textTertiary,
+        fontWeight: "600",
     },
     chartLegend: {
-        fontSize: 11,
-        color: "#94a3b8",
+        fontSize: 10.5,
+        color: Colors.textTertiary,
         textAlign: "center",
-        marginTop: 12,
+        marginTop: 14,
+        lineHeight: 15,
     },
 });

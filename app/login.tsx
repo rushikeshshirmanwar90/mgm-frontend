@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
@@ -11,9 +10,25 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
 import { useRouter } from "expo-router";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Button, TextField } from "@/components/ui";
+
+type DemoRole = "staff" | "manager" | "admin";
+
+const DEMO_ROLES: {
+    role: DemoRole;
+    label: string;
+    icon: React.ComponentProps<typeof Ionicons>["name"];
+}[] = [
+    { role: "staff", label: "Staff", icon: "person-outline" },
+    { role: "manager", label: "Manager", icon: "briefcase-outline" },
+    { role: "admin", label: "Admin", icon: "shield-checkmark-outline" },
+];
 
 export default function LoginScreen() {
     const { login, seedDatabase } = useAuth();
@@ -59,7 +74,7 @@ export default function LoginScreen() {
         }
     };
 
-    const handleSeedAndFill = async (role: "admin" | "manager" | "staff") => {
+    const handleSeedAndFill = async (role: DemoRole) => {
         setSeeding(true);
         try {
             await seedDatabase();
@@ -73,7 +88,10 @@ export default function LoginScreen() {
                 setEmail("staff@mgm.edu");
                 setPassword("staff123");
             }
-            Alert.alert("Database Seeded", `Pre-filled ${role.toUpperCase()} credentials! Click Sign In.`);
+            Alert.alert(
+                "Database Seeded",
+                `Pre-filled ${role.toUpperCase()} credentials! Click Sign In.`
+            );
         } catch (e) {
             Alert.alert(
                 "Could Not Seed",
@@ -87,104 +105,121 @@ export default function LoginScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-        >
-            <ScrollView contentContainerStyle={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.logo}>🏫</Text>
-                    <Text style={styles.title}>MGM Maintenance Portal</Text>
-                    <Text style={styles.subtitle}>
-                        College Infrastructure & Complaint Management System
-                    </Text>
-                </View>
-
-                <View style={styles.formCard}>
-                    <Text style={styles.formTitle}>Sign In</Text>
-
-                    <Text style={styles.label}>Email Address</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder="e.g. staff@mgm.edu"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-
-                    <Text style={styles.label}>Password</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="••••••••"
-                        secureTextEntry
-                    />
-
-                    <TouchableOpacity
-                        style={styles.loginBtn}
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.loginBtnText}>Sign In</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    <View style={styles.registerRow}>
-                        <Text style={styles.registerText}>Are you a staff member?</Text>
-                        <TouchableOpacity onPress={() => router.push("/register")}>
-                            <Text style={styles.registerLink}> Register Here</Text>
-                        </TouchableOpacity>
+        <SafeAreaView style={styles.safe}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.flex}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.container}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Brand */}
+                    <View style={styles.header}>
+                        <View style={styles.logoMark}>
+                            <Ionicons name="business" size={28} color="#FFFFFF" />
+                        </View>
+                        <Text style={styles.title}>MGM Maintenance</Text>
+                        <Text style={styles.subtitle}>
+                            Campus infrastructure & complaint management
+                        </Text>
                     </View>
-                </View>
 
-                {/* Quick Seed & Demo Fill Box */}
-                <View style={styles.demoCard}>
-                    <Text style={styles.demoTitle}>⚡ Quick Demo Credentials (Click to Fill)</Text>
-                    <Text style={styles.demoSubtitle}>
-                        Auto-seeds database with sample building, floors, rooms & users
-                    </Text>
+                    {/* Sign-in form */}
+                    <View style={styles.formCard}>
+                        <Text style={styles.formTitle}>Welcome back</Text>
+                        <Text style={styles.formSubtitle}>
+                            Sign in to report and track campus issues.
+                        </Text>
 
-                    {seeding ? (
-                        <ActivityIndicator color="#2563eb" style={{ marginVertical: 10 }} />
-                    ) : (
-                        <View style={styles.demoBtnRow}>
+                        <TextField
+                            label="Email address"
+                            icon="mail-outline"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="staff@mgm.edu"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                        />
+
+                        <TextField
+                            label="Password"
+                            icon="lock-closed-outline"
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="••••••••"
+                            isPassword
+                            autoCapitalize="none"
+                        />
+
+                        <Button
+                            label="Sign In"
+                            icon="arrow-forward"
+                            iconAfter
+                            size="lg"
+                            fullWidth
+                            loading={loading}
+                            onPress={handleLogin}
+                            style={styles.signInBtn}
+                        />
+
+                        <View style={styles.registerRow}>
+                            <Text style={styles.registerText}>Are you a staff member?</Text>
                             <TouchableOpacity
-                                style={[styles.demoBtn, { backgroundColor: "#dbeafe" }]}
-                                onPress={() => handleSeedAndFill("staff")}
+                                onPress={() => router.push("/register")}
+                                hitSlop={8}
                             >
-                                <Text style={[styles.demoBtnText, { color: "#1d4ed8" }]}>👤 Staff Demo</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.demoBtn, { backgroundColor: "#fef3c7" }]}
-                                onPress={() => handleSeedAndFill("manager")}
-                            >
-                                <Text style={[styles.demoBtnText, { color: "#b45309" }]}>👔 Manager Demo</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.demoBtn, { backgroundColor: "#fce7f3" }]}
-                                onPress={() => handleSeedAndFill("admin")}
-                            >
-                                <Text style={[styles.demoBtnText, { color: "#be185d" }]}>👑 Admin Demo</Text>
+                                <Text style={styles.registerLink}> Register here</Text>
                             </TouchableOpacity>
                         </View>
-                    )}
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    </View>
+
+                    {/* Demo credentials */}
+                    <View style={styles.demoCard}>
+                        <View style={styles.demoHeader}>
+                            <Ionicons name="flash" size={14} color={Colors.warningDark} />
+                            <Text style={styles.demoTitle}>Quick demo access</Text>
+                        </View>
+                        <Text style={styles.demoSubtitle}>
+                            Seeds sample buildings, floors, rooms and users, then fills the form.
+                        </Text>
+
+                        {seeding ? (
+                            <ActivityIndicator color={Colors.primary} style={styles.demoSpinner} />
+                        ) : (
+                            <View style={styles.demoBtnRow}>
+                                {DEMO_ROLES.map(({ role, label, icon }) => (
+                                    <TouchableOpacity
+                                        key={role}
+                                        style={styles.demoBtn}
+                                        onPress={() => handleSeedAndFill(role)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name={icon} size={16} color={Colors.primary} />
+                                        <Text style={styles.demoBtnText}>{label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safe: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    flex: {
+        flex: 1,
+    },
     container: {
         flexGrow: 1,
-        backgroundColor: "#f8fafc",
         padding: 24,
         justifyContent: "center",
     },
@@ -192,113 +227,120 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 28,
     },
-    logo: {
-        fontSize: 48,
-        marginBottom: 8,
+    logoMark: {
+        width: 62,
+        height: 62,
+        borderRadius: Radius.xl,
+        backgroundColor: Colors.primary,
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 14,
+        ...Shadow.lg,
     },
     title: {
         fontSize: 24,
         fontWeight: "800",
-        color: "#0f172a",
+        color: Colors.textPrimary,
+        letterSpacing: -0.5,
         textAlign: "center",
     },
     subtitle: {
         fontSize: 13,
-        color: "#64748b",
+        color: Colors.textSecondary,
         textAlign: "center",
-        marginTop: 4,
+        marginTop: 5,
     },
     formCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 18,
-        padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
-        marginBottom: 20,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xxl,
+        padding: 22,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        marginBottom: 18,
+        ...Shadow.md,
     },
     formTitle: {
         fontSize: 18,
-        fontWeight: "700",
-        color: "#1e293b",
-        marginBottom: 16,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
     },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
-        marginBottom: 6,
+    formSubtitle: {
+        fontSize: 12.5,
+        color: Colors.textSecondary,
+        marginTop: 3,
+        marginBottom: 20,
     },
-    input: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 15,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: "#e2e8f0",
-    },
-    loginBtn: {
-        backgroundColor: "#2563eb",
-        borderRadius: 10,
-        paddingVertical: 14,
-        alignItems: "center",
-        marginTop: 8,
-    },
-    loginBtnText: {
-        color: "#ffffff",
-        fontSize: 16,
-        fontWeight: "700",
+    signInBtn: {
+        marginTop: 4,
     },
     registerRow: {
         flexDirection: "row",
         justifyContent: "center",
-        marginTop: 16,
+        alignItems: "center",
+        marginTop: 18,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
     },
     registerText: {
-        fontSize: 14,
-        color: "#64748b",
+        fontSize: 13,
+        color: Colors.textSecondary,
     },
     registerLink: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: "700",
-        color: "#2563eb",
+        color: Colors.primary,
     },
     demoCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.lg,
         padding: 16,
         borderWidth: 1,
-        borderColor: "#cbd5e1",
+        borderColor: Colors.border,
         borderStyle: "dashed",
     },
+    demoHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
     demoTitle: {
-        fontSize: 14,
+        fontSize: 11.5,
         fontWeight: "700",
-        color: "#334155",
-        marginBottom: 2,
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
     },
     demoSubtitle: {
-        fontSize: 12,
-        color: "#64748b",
+        fontSize: 11.5,
+        color: Colors.textTertiary,
+        marginTop: 4,
         marginBottom: 12,
+        lineHeight: 16,
+    },
+    demoSpinner: {
+        marginVertical: 10,
     },
     demoBtnRow: {
         flexDirection: "row",
-        justifyContent: "space-between",
         gap: 8,
     },
     demoBtn: {
         flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
+        flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.primaryLight,
+        borderWidth: 1,
+        borderColor: Colors.primaryBorder,
     },
     demoBtnText: {
         fontSize: 12,
         fontWeight: "700",
+        color: Colors.primaryDark,
     },
 });

@@ -5,16 +5,23 @@ import {
     StyleSheet,
     FlatList,
     TouchableOpacity,
-    TextInput,
     Modal,
     Alert,
     RefreshControl,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/api";
 import { User, UserResponse, UsersResponse, UserRole } from "@/lib/types";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Banner, Button, ChipGroup, EmptyState, TextField } from "@/components/ui";
 
 type FilterKey = "all" | "staff" | "manager" | "admin" | "pending" | "rejected";
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const FILTERS: { key: FilterKey; label: string; query: string }[] = [
     { key: "all", label: "All", query: "" },
@@ -25,13 +32,15 @@ const FILTERS: { key: FilterKey; label: string; query: string }[] = [
     { key: "rejected", label: "Rejected", query: "?status=rejected" },
 ];
 
-const ROLE_STYLES: Record<UserRole, { bg: string; fg: string; icon: string }> = {
-    admin: { bg: "#fce7f3", fg: "#be185d", icon: "👑" },
-    manager: { bg: "#fef3c7", fg: "#b45309", icon: "👔" },
-    staff: { bg: "#dbeafe", fg: "#1d4ed8", icon: "👤" },
+const ROLE_STYLES: Record<UserRole, { bg: string; fg: string; icon: IoniconName }> = {
+    admin: { bg: Colors.primaryLight, fg: Colors.primaryDark, icon: "shield-checkmark" },
+    manager: { bg: Colors.warningLight, fg: Colors.warningDark, icon: "briefcase" },
+    staff: { bg: Colors.successLight, fg: Colors.successDark, icon: "person" },
 };
 
 export default function AdminUsersScreen() {
+    // Keeps the sheet's action buttons clear of the system navigation area.
+    const insets = useSafeAreaInsets();
     const [users, setUsers] = useState<User[]>([]);
     const [filter, setFilter] = useState<FilterKey>("all");
     const [refreshing, setRefreshing] = useState(false);
@@ -132,51 +141,48 @@ export default function AdminUsersScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerRow}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.title}>User Management 👥</Text>
-                    <Text style={styles.subtitle}>
-                        {counts.total} account{counts.total === 1 ? "" : "s"}
-                        {counts.pending > 0 ? ` · ${counts.pending} awaiting review` : ""}
-                    </Text>
+            <View style={styles.header}>
+                <View style={styles.headerRow}>
+                    <View style={styles.headerText}>
+                        <Text style={styles.headerCount}>
+                            {counts.total} account{counts.total === 1 ? "" : "s"}
+                        </Text>
+                        <Text style={styles.headerMeta}>
+                            {counts.pending > 0
+                                ? `${counts.pending} awaiting review`
+                                : "All reviewed"}
+                        </Text>
+                    </View>
+                    <Button
+                        label="New"
+                        icon="add"
+                        size="sm"
+                        onPress={() => setModalOpen(true)}
+                    />
                 </View>
-                <TouchableOpacity style={styles.addBtn} onPress={() => setModalOpen(true)}>
-                    <Text style={styles.addBtnText}>+ New</Text>
-                </TouchableOpacity>
+
+                <ChipGroup
+                    options={FILTERS.map((f) => ({ key: f.key, label: f.label }))}
+                    value={filter}
+                    onChange={(k) => setFilter(k as FilterKey)}
+                />
             </View>
 
-            <FlatList
-                horizontal
-                data={FILTERS}
-                keyExtractor={(f) => f.key}
-                showsHorizontalScrollIndicator={false}
-                style={styles.filterRow}
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={[styles.filterChip, filter === item.key && styles.activeFilterChip]}
-                        onPress={() => setFilter(item.key)}
-                    >
-                        <Text
-                            style={[
-                                styles.filterText,
-                                filter === item.key && styles.activeFilterText,
-                            ]}
-                        >
-                            {item.label}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            />
-
-            {busy && <ActivityIndicator color="#be185d" style={{ marginVertical: 8 }} />}
+            {busy && <ActivityIndicator color={Colors.primary} style={styles.busy} />}
 
             <FlatList
                 data={users}
                 keyExtractor={(item) => item._id || item.id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadUsers} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={loadUsers}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
                 }
-                contentContainerStyle={{ paddingBottom: 24 }}
                 renderItem={({ item }) => {
                     const roleStyle = ROLE_STYLES[item.role];
                     const isPending = item.approvalStatus === "pending";
@@ -185,19 +191,33 @@ export default function AdminUsersScreen() {
                     return (
                         <View style={styles.card}>
                             <View style={styles.cardTop}>
-                                <View style={[styles.avatar, { backgroundColor: roleStyle.bg }]}>
-                                    <Text style={styles.avatarText}>{roleStyle.icon}</Text>
+                                <View
+                                    style={[styles.avatar, { backgroundColor: roleStyle.bg }]}
+                                >
+                                    <Ionicons
+                                        name={roleStyle.icon}
+                                        size={19}
+                                        color={roleStyle.fg}
+                                    />
                                 </View>
 
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.userName}>{item.name}</Text>
-                                    <Text style={styles.userEmail}>{item.email}</Text>
+                                <View style={styles.identity}>
+                                    <Text style={styles.userName} numberOfLines={1}>
+                                        {item.name}
+                                    </Text>
+                                    <Text style={styles.userEmail} numberOfLines={1}>
+                                        {item.email}
+                                    </Text>
                                     {item.department ? (
-                                        <Text style={styles.userDept}>{item.department}</Text>
+                                        <Text style={styles.userDept} numberOfLines={1}>
+                                            {item.department}
+                                        </Text>
                                     ) : null}
                                 </View>
 
-                                <View style={[styles.roleBadge, { backgroundColor: roleStyle.bg }]}>
+                                <View
+                                    style={[styles.roleBadge, { backgroundColor: roleStyle.bg }]}
+                                >
                                     <Text style={[styles.roleText, { color: roleStyle.fg }]}>
                                         {item.role}
                                     </Text>
@@ -205,49 +225,17 @@ export default function AdminUsersScreen() {
                             </View>
 
                             <View style={styles.badgeRow}>
-                                <View
-                                    style={[
-                                        styles.stateBadge,
-                                        item.isEmailVerified ? styles.okBadge : styles.warnBadge,
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.stateText,
-                                            item.isEmailVerified ? styles.okText : styles.warnText,
-                                        ]}
-                                    >
-                                        {item.isEmailVerified ? "Email verified" : "Email unverified"}
-                                    </Text>
-                                </View>
-
-                                <View
-                                    style={[
-                                        styles.stateBadge,
-                                        item.isApproved
-                                            ? styles.okBadge
-                                            : isRejected
-                                              ? styles.badBadge
-                                              : styles.warnBadge,
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.stateText,
-                                            item.isApproved
-                                                ? styles.okText
-                                                : isRejected
-                                                  ? styles.badText
-                                                  : styles.warnText,
-                                        ]}
-                                    >
-                                        {item.isApproved
-                                            ? "Approved"
-                                            : isRejected
-                                              ? "Rejected"
-                                              : "Pending approval"}
-                                    </Text>
-                                </View>
+                                <StateBadge
+                                    ok={item.isEmailVerified}
+                                    okLabel="Email verified"
+                                    offLabel="Email unverified"
+                                />
+                                <StateBadge
+                                    ok={item.isApproved}
+                                    bad={isRejected}
+                                    okLabel="Approved"
+                                    offLabel={isRejected ? "Rejected" : "Pending approval"}
+                                />
                             </View>
 
                             {/* Only staff accounts are reviewable here; the backend
@@ -256,353 +244,407 @@ export default function AdminUsersScreen() {
                             {(isPending || isRejected) && item.role === "staff" && (
                                 <View style={styles.actionRow}>
                                     {isPending && (
-                                        <TouchableOpacity
-                                            style={[styles.btn, styles.rejectBtn]}
+                                        <Button
+                                            label="Reject"
+                                            icon="close"
+                                            variant="danger"
+                                            size="sm"
                                             onPress={() => handleReview(item, "reject")}
-                                        >
-                                            <Text style={styles.rejectText}>Reject</Text>
-                                        </TouchableOpacity>
+                                            style={styles.actionBtn}
+                                        />
                                     )}
-                                    <TouchableOpacity
-                                        style={[styles.btn, styles.approveBtn]}
+                                    <Button
+                                        label={isRejected ? "Reinstate" : "Approve"}
+                                        icon="checkmark"
+                                        size="sm"
                                         onPress={() => handleReview(item, "approve")}
-                                    >
-                                        <Text style={styles.approveText}>
-                                            {isRejected ? "Reinstate ✓" : "Approve ✓"}
-                                        </Text>
-                                    </TouchableOpacity>
+                                        style={styles.actionBtn}
+                                    />
                                 </View>
                             )}
                         </View>
                     );
                 }}
                 ListEmptyComponent={
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyIcon}>🗂️</Text>
-                        <Text style={styles.emptyText}>No accounts in this view</Text>
-                    </View>
+                    <EmptyState
+                        icon="folder-open-outline"
+                        title="No accounts in this view"
+                        message="Try a different filter."
+                        style={styles.empty}
+                    />
                 }
             />
 
             {/* Create user modal */}
-            <Modal visible={modalOpen} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Create Account</Text>
-                        <Text style={styles.modalHint}>
-                            Accounts created here skip email verification and manager approval.
-                        </Text>
+            <Modal
+                visible={modalOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setModalOpen(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                    style={styles.modalOverlay}
+                >
+                    <View style={[styles.sheet, { paddingBottom: 22 + insets.bottom }]}>
+                        <View style={styles.grabber} />
 
-                        <Text style={styles.label}>Role</Text>
-                        <View style={styles.roleSelectRow}>
-                            {(["staff", "manager", "admin"] as const).map((r) => (
-                                <TouchableOpacity
-                                    key={r}
-                                    style={[styles.roleSelChip, role === r && styles.activeRoleSelChip]}
-                                    onPress={() => setRole(r)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.roleSelText,
-                                            role === r && styles.activeRoleSelText,
-                                        ]}
-                                    >
-                                        {ROLE_STYLES[r].icon} {r}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        <Text style={styles.label}>Full Name</Text>
-                        <TextInput style={styles.input} value={name} onChangeText={setName} />
-
-                        <Text style={styles.label}>Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-
-                        <Text style={styles.label}>Temporary Password (min 6 chars)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
-
-                        <Text style={styles.label}>Department</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={department}
-                            onChangeText={setDepartment}
-                            placeholder="e.g. Civil Engineering"
-                        />
-
-                        <View style={styles.btnRow}>
+                        <View style={styles.sheetHeader}>
+                            <View style={styles.sheetHeaderText}>
+                                <Text style={styles.sheetTitle}>Create account</Text>
+                                <Text style={styles.sheetSubtitle}>
+                                    Skips email verification and manager approval.
+                                </Text>
+                            </View>
                             <TouchableOpacity
-                                style={styles.cancelBtn}
                                 onPress={() => {
                                     setModalOpen(false);
                                     resetForm();
                                 }}
+                                hitSlop={10}
                             >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.saveBtn}
-                                onPress={handleCreateUser}
-                                disabled={busy}
-                            >
-                                <Text style={styles.saveText}>Create Account</Text>
+                                <Ionicons name="close" size={22} color={Colors.textTertiary} />
                             </TouchableOpacity>
                         </View>
+
+                        <ScrollView
+                            style={styles.sheetBody}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                        >
+                            <Text style={styles.fieldLabel}>Role</Text>
+                            <View style={styles.roleRow}>
+                                {(["staff", "manager", "admin"] as const).map((r) => {
+                                    const active = role === r;
+                                    const tone = ROLE_STYLES[r];
+                                    return (
+                                        <TouchableOpacity
+                                            key={r}
+                                            onPress={() => setRole(r)}
+                                            activeOpacity={0.8}
+                                            style={[
+                                                styles.roleChip,
+                                                active && {
+                                                    backgroundColor: tone.bg,
+                                                    borderColor: tone.fg,
+                                                },
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name={tone.icon}
+                                                size={15}
+                                                color={active ? tone.fg : Colors.textTertiary}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.roleChipText,
+                                                    active && { color: tone.fg },
+                                                ]}
+                                            >
+                                                {r}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            <TextField
+                                label="Full name"
+                                icon="person-outline"
+                                value={name}
+                                onChangeText={setName}
+                                placeholder="e.g. Prof. Sharma"
+                            />
+                            <TextField
+                                label="Email"
+                                icon="mail-outline"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                placeholder="name@mgm.edu"
+                            />
+                            <TextField
+                                label="Temporary password"
+                                hint="min 6 chars"
+                                icon="lock-closed-outline"
+                                value={password}
+                                onChangeText={setPassword}
+                                isPassword
+                                autoCapitalize="none"
+                            />
+                            <TextField
+                                label="Department"
+                                hint="optional"
+                                icon="school-outline"
+                                value={department}
+                                onChangeText={setDepartment}
+                                placeholder="e.g. Civil Engineering"
+                            />
+
+                            <Banner
+                                tone="info"
+                                title="Pre-approved account"
+                                message="This person can sign in immediately with the password you set."
+                            />
+                        </ScrollView>
+
+                        <View style={styles.sheetActions}>
+                            <Button
+                                label="Cancel"
+                                variant="ghost"
+                                size="lg"
+                                onPress={() => {
+                                    setModalOpen(false);
+                                    resetForm();
+                                }}
+                                style={styles.sheetActionBtn}
+                            />
+                            <Button
+                                label="Create account"
+                                icon="checkmark"
+                                size="lg"
+                                loading={busy}
+                                onPress={handleCreateUser}
+                                style={styles.sheetActionBtn}
+                            />
+                        </View>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );
 }
 
+/** Small pass/fail pill used for the verification and approval flags. */
+const StateBadge: React.FC<{
+    ok: boolean;
+    bad?: boolean;
+    okLabel: string;
+    offLabel: string;
+}> = ({ ok, bad = false, okLabel, offLabel }) => {
+    const tone = ok
+        ? { bg: Colors.successLight, fg: Colors.successDark, icon: "checkmark-circle" as IoniconName }
+        : bad
+          ? { bg: Colors.errorLight, fg: Colors.errorDark, icon: "close-circle" as IoniconName }
+          : { bg: Colors.warningLight, fg: Colors.warningDark, icon: "time" as IoniconName };
+
+    return (
+        <View style={[styles.stateBadge, { backgroundColor: tone.bg }]}>
+            <Ionicons name={tone.icon} size={11} color={tone.fg} />
+            <Text style={[styles.stateText, { color: tone.fg }]}>{ok ? okLabel : offLabel}</Text>
+        </View>
+    );
+};
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
+        backgroundColor: Colors.background,
+    },
+    header: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
     },
     headerRow: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 12,
+        gap: 12,
+        marginBottom: 14,
     },
-    title: {
-        fontSize: 20,
+    headerText: {
+        flex: 1,
+    },
+    headerCount: {
+        fontSize: 17,
         fontWeight: "800",
-        color: "#0f172a",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
     },
-    subtitle: {
-        fontSize: 13,
-        color: "#64748b",
+    headerMeta: {
+        fontSize: 12,
+        color: Colors.textSecondary,
         marginTop: 2,
     },
-    addBtn: {
-        backgroundColor: "#be185d",
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 8,
+    busy: {
+        marginVertical: 6,
     },
-    addBtnText: {
-        color: "#ffffff",
-        fontSize: 13,
-        fontWeight: "700",
-    },
-    filterRow: {
-        marginBottom: 12,
-        flexGrow: 0,
-    },
-    filterChip: {
-        backgroundColor: "#ffffff",
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: "#e2e8f0",
-    },
-    activeFilterChip: {
-        backgroundColor: "#be185d",
-        borderColor: "#9d174d",
-    },
-    filterText: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#475569",
-    },
-    activeFilterText: {
-        color: "#ffffff",
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 28,
     },
     card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
         padding: 14,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: "#e2e8f0",
+        borderColor: Colors.borderCard,
+        ...Shadow.sm,
     },
     cardTop: {
         flexDirection: "row",
         alignItems: "center",
+        gap: 12,
     },
     avatar: {
         width: 42,
         height: 42,
-        borderRadius: 21,
+        borderRadius: Radius.md,
         alignItems: "center",
         justifyContent: "center",
-        marginRight: 12,
     },
-    avatarText: {
-        fontSize: 20,
+    identity: {
+        flex: 1,
     },
     userName: {
-        fontSize: 15,
-        fontWeight: "700",
-        color: "#0f172a",
+        fontSize: 14.5,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
     },
     userEmail: {
         fontSize: 12,
-        color: "#64748b",
+        color: Colors.textSecondary,
+        marginTop: 1,
     },
     userDept: {
         fontSize: 11,
-        color: "#2563eb",
+        color: Colors.primary,
         fontWeight: "600",
         marginTop: 2,
     },
     roleBadge: {
-        paddingHorizontal: 10,
+        paddingHorizontal: 9,
         paddingVertical: 4,
-        borderRadius: 8,
+        borderRadius: Radius.full,
     },
     roleText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: "800",
         textTransform: "uppercase",
+        letterSpacing: 0.3,
     },
     badgeRow: {
         flexDirection: "row",
-        gap: 8,
+        flexWrap: "wrap",
+        gap: 6,
         marginTop: 12,
     },
     stateBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
         paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 6,
+        borderRadius: Radius.full,
     },
     stateText: {
         fontSize: 10,
         fontWeight: "700",
     },
-    okBadge: { backgroundColor: "#dcfce7" },
-    okText: { color: "#166534" },
-    warnBadge: { backgroundColor: "#fef3c7" },
-    warnText: { color: "#b45309" },
-    badBadge: { backgroundColor: "#fee2e2" },
-    badText: { color: "#b91c1c" },
     actionRow: {
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 10,
+        gap: 8,
         marginTop: 12,
     },
-    btn: {
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        borderRadius: 8,
+    actionBtn: {
+        minWidth: 104,
     },
-    rejectBtn: { backgroundColor: "#fee2e2" },
-    rejectText: { color: "#dc2626", fontWeight: "700", fontSize: 12 },
-    approveBtn: { backgroundColor: "#16a34a" },
-    approveText: { color: "#ffffff", fontWeight: "700", fontSize: 12 },
-    emptyBox: {
-        alignItems: "center",
-        paddingVertical: 60,
-    },
-    emptyIcon: {
-        fontSize: 40,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 15,
-        fontWeight: "700",
-        color: "#334155",
+    empty: {
+        marginTop: 40,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        padding: 20,
+        backgroundColor: "rgba(15,23,42,0.55)",
+        justifyContent: "flex-end",
     },
-    modalContent: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 20,
+    sheet: {
+        backgroundColor: Colors.surface,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        paddingTop: 10,
+        paddingBottom: 22,
+        maxHeight: "92%",
+        ...Shadow.lg,
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: "800",
-        color: "#0f172a",
+    grabber: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: Colors.border,
+        alignSelf: "center",
+        marginBottom: 14,
     },
-    modalHint: {
-        fontSize: 12,
-        color: "#64748b",
-        marginTop: 4,
-        marginBottom: 6,
-    },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
-        marginBottom: 4,
-        marginTop: 8,
-    },
-    input: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 14,
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
-    },
-    roleSelectRow: {
+    sheetHeader: {
         flexDirection: "row",
-        gap: 6,
-    },
-    roleSelChip: {
-        flex: 1,
-        backgroundColor: "#f1f5f9",
-        paddingVertical: 8,
-        borderRadius: 6,
         alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.borderLight,
     },
-    activeRoleSelChip: {
-        backgroundColor: "#be185d",
+    sheetHeaderText: {
+        flex: 1,
     },
-    roleSelText: {
+    sheetTitle: {
+        fontSize: 17,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
+    },
+    sheetSubtitle: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+        marginTop: 2,
+    },
+    sheetBody: {
+        paddingHorizontal: 20,
+        paddingTop: 18,
+    },
+    fieldLabel: {
         fontSize: 11,
         fontWeight: "700",
-        color: "#475569",
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8,
     },
-    activeRoleSelText: {
-        color: "#ffffff",
-    },
-    btnRow: {
+    roleRow: {
         flexDirection: "row",
-        justifyContent: "flex-end",
-        gap: 10,
-        marginTop: 18,
+        gap: 8,
+        marginBottom: 18,
     },
-    cancelBtn: {
+    roleChip: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
         paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 8,
-        backgroundColor: "#f1f5f9",
+        borderRadius: Radius.md,
+        backgroundColor: Colors.borderLight,
+        borderWidth: 1,
+        borderColor: "transparent",
     },
-    cancelText: {
-        color: "#475569",
-        fontWeight: "600",
-    },
-    saveBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        backgroundColor: "#be185d",
-    },
-    saveText: {
-        color: "#ffffff",
+    roleChipText: {
+        fontSize: 11.5,
         fontWeight: "700",
+        color: Colors.textSecondary,
+        textTransform: "capitalize",
+    },
+    sheetActions: {
+        flexDirection: "row",
+        gap: 10,
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
+    },
+    sheetActionBtn: {
+        flex: 1,
     },
 });

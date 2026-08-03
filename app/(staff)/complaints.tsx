@@ -1,19 +1,26 @@
-import React, { useCallback, useState, useEffect } from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
-    RefreshControl,
-} from "react-native";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
+import { View, Text, StyleSheet, FlatList, RefreshControl } from "react-native";
+import { useRouter } from "expo-router";
 import { apiRequest } from "@/lib/api";
 import { Complaint, ComplaintsResponse } from "@/lib/types";
+import { searchComplaints } from "@/lib/complaint-search";
 import { ComplaintCard } from "@/components/ComplaintCard";
+import { Colors } from "@/constants/theme";
+import { ChipGroup, EmptyState, SearchBar } from "@/components/ui";
+
+const STATUS_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "pending", label: "Waiting" },
+    { key: "in_progress", label: "Being fixed" },
+    { key: "resolved", label: "Done" },
+] as const;
 
 export default function MyComplaintsScreen() {
+    const router = useRouter();
+
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [query, setQuery] = useState("");
     const [refreshing, setRefreshing] = useState(false);
 
     const loadComplaints = useCallback(async () => {
@@ -33,42 +40,81 @@ export default function MyComplaintsScreen() {
         loadComplaints();
     }, [loadComplaints]);
 
+    const visible = useMemo(
+        () => searchComplaints(complaints, query),
+        [complaints, query]
+    );
+
+    const filterLabel =
+        STATUS_FILTERS.find((f) => f.key === statusFilter)?.label ?? statusFilter;
+
     return (
         <View style={styles.container}>
-            {/* Filter Tabs */}
-            <View style={styles.filterRow}>
-                {["all", "pending", "in_progress", "resolved"].map((st) => (
-                    <TouchableOpacity
-                        key={st}
-                        style={[styles.filterChip, statusFilter === st && styles.activeFilterChip]}
-                        onPress={() => setStatusFilter(st)}
-                    >
-                        <Text style={[styles.filterText, statusFilter === st && styles.activeFilterText]}>
-                            {st === "all" ? "All" : st === "in_progress" ? "In Progress" : st.toUpperCase()}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.header}>
+                <SearchBar
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search by issue, building or room"
+                    style={styles.search}
+                />
+                <ChipGroup
+                    options={[...STATUS_FILTERS]}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                />
+                {visible.length > 0 && (
+                    <Text style={styles.count}>
+                        Showing {visible.length} complaint{visible.length === 1 ? "" : "s"}
+                    </Text>
+                )}
             </View>
 
             <FlatList
-                data={complaints}
+                data={visible}
                 keyExtractor={(item) => item._id}
-                renderItem={({ item }) => <ComplaintCard complaint={item} showCost />}
+                renderItem={({ item }) => (
+                    <ComplaintCard
+                        complaint={item}
+                        showCost
+                        onPress={() => router.push(`/complaint/${item._id}`)}
+                    />
+                )}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadComplaints} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={loadComplaints}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
                 }
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyIcon}>📋</Text>
-                        <Text style={styles.emptyText}>No complaints found</Text>
-                        <Text style={styles.emptySub}>
-                            {statusFilter === "all"
-                                ? "You haven't submitted any complaints yet."
-                                : `No complaints with status "${statusFilter}".`}
-                        </Text>
-                    </View>
+                    query ? (
+                        <EmptyState
+                            icon="search-outline"
+                            title="No matches"
+                            message={`Nothing matches “${query}”. Try a building name or room number.`}
+                            style={styles.empty}
+                        />
+                    ) : (
+                        <EmptyState
+                            icon="document-text-outline"
+                            title={
+                                statusFilter === "all"
+                                    ? "No complaints yet"
+                                    : `Nothing is "${filterLabel}"`
+                            }
+                            message={
+                                statusFilter === "all"
+                                    ? "Anything you report will appear here so you can follow its progress."
+                                    : "Try another filter to see your other complaints."
+                            }
+                            style={styles.empty}
+                        />
+                    )
                 }
-                contentContainerStyle={{ paddingBottom: 20 }}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             />
         </View>
     );
@@ -77,53 +123,27 @@ export default function MyComplaintsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
+        backgroundColor: Colors.background,
     },
-    filterRow: {
-        flexDirection: "row",
-        gap: 6,
+    header: {
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 12,
+    },
+    search: {
         marginBottom: 12,
     },
-    filterChip: {
-        flex: 1,
-        backgroundColor: "#ffffff",
-        paddingVertical: 8,
-        borderRadius: 20,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
-    },
-    activeFilterChip: {
-        backgroundColor: "#2563eb",
-        borderColor: "#1d4ed8",
-    },
-    filterText: {
-        fontSize: 12,
+    count: {
+        fontSize: 11,
         fontWeight: "600",
-        color: "#475569",
+        color: Colors.textTertiary,
+        marginTop: 12,
     },
-    activeFilterText: {
-        color: "#ffffff",
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 28,
     },
-    emptyContainer: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 60,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#334155",
-    },
-    emptySub: {
-        fontSize: 13,
-        color: "#64748b",
-        textAlign: "center",
-        marginTop: 4,
+    empty: {
+        marginTop: 40,
     },
 });

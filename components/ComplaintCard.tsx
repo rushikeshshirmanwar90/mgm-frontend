@@ -1,215 +1,351 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Complaint } from "@/lib/types";
+import { Colors, PriorityColors, Radius, Shadow, StatusColors, inr } from "@/constants/theme";
 import { StatusBadge } from "./StatusBadge";
+import { IconChip } from "./ui/IconChip";
 
 interface ComplaintCardProps {
     complaint: Complaint;
     onPress?: () => void;
     showCost?: boolean;
+    /** Manager/admin control bar docked to the bottom of the card. */
+    footer?: React.ReactNode;
 }
+
+const LOCATION_ICONS: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
+    classroom: "school-outline",
+    washroom: "water-outline",
+    lab: "flask-outline",
+    office: "briefcase-outline",
+    library: "library-outline",
+    corridor: "walk-outline",
+    other: "ellipsis-horizontal-circle-outline",
+};
 
 export const ComplaintCard: React.FC<ComplaintCardProps> = ({
     complaint,
     onPress,
     showCost = false,
+    footer,
 }) => {
-    const buildingName = typeof complaint.buildingId === "object" ? complaint.buildingId.name : "Building";
+    const buildingName =
+        typeof complaint.buildingId === "object" ? complaint.buildingId.name : "Building";
     const floorName = typeof complaint.floorId === "object" ? complaint.floorId.name : "Floor";
-    const roomInfo = typeof complaint.roomId === "object" && complaint.roomId ? complaint.roomId.roomNumber : null;
-    const raisedByName = typeof complaint.raisedBy === "object" ? complaint.raisedBy.name : "Staff";
+    const roomInfo =
+        typeof complaint.roomId === "object" && complaint.roomId
+            ? complaint.roomId.roomNumber
+            : null;
+    const raisedByName =
+        typeof complaint.raisedBy === "object" ? complaint.raisedBy.name : "Staff";
 
     const costDetails = complaint.costDetails;
+    const hasCost = showCost && !!costDetails && costDetails.totalCost > 0;
+
+    const accent = StatusColors[complaint.status]?.dot ?? Colors.primary;
+    const priority = PriorityColors[complaint.priority] ?? PriorityColors.low;
+    const locationIcon = LOCATION_ICONS[complaint.locationType] ?? "location-outline";
+
+    const Wrapper: React.ComponentType<any> = onPress ? TouchableOpacity : View;
 
     return (
-        <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-            <View style={styles.header}>
-                <StatusBadge status={complaint.status} />
-                <Text style={styles.date}>
-                    {new Date(complaint.createdAt).toLocaleDateString()}
-                </Text>
-            </View>
+        <View style={styles.shadowWrap}>
+            <View style={styles.card}>
+                <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
-            <Text style={styles.title}>{complaint.title}</Text>
-            <Text style={styles.description} numberOfLines={2}>
-                {complaint.description}
-            </Text>
+                <Wrapper
+                    style={styles.inner}
+                    onPress={onPress}
+                    activeOpacity={onPress ? 0.85 : undefined}
+                >
+                    {/* Status + date */}
+                    <View style={styles.topRow}>
+                        <StatusBadge status={complaint.status} />
+                        <Text style={styles.date}>
+                            {new Date(complaint.createdAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                            })}
+                        </Text>
+                    </View>
 
-            <View style={styles.locationContainer}>
-                <Text style={styles.locationLabel}>📍 Location:</Text>
-                <Text style={styles.locationValue}>
-                    {buildingName} › {floorName} {roomInfo ? `(${roomInfo})` : complaint.locationType}
-                </Text>
-            </View>
+                    <Text style={styles.title} numberOfLines={2}>
+                        {complaint.title}
+                    </Text>
+                    <Text style={styles.description} numberOfLines={2}>
+                        {complaint.description}
+                    </Text>
 
-            {complaint.photos && complaint.photos.length > 0 && (
-                <View style={styles.photoRow}>
-                    {complaint.photos.slice(0, 3).map((photoUrl, idx) => (
-                        <Image key={idx} source={{ uri: photoUrl }} style={styles.thumbnail} />
-                    ))}
-                    {complaint.photos.length > 3 && (
-                        <View style={styles.morePhotos}>
-                            <Text style={styles.moreText}>+{complaint.photos.length - 3}</Text>
+                    {/* Location row */}
+                    <View style={styles.row}>
+                        <IconChip name={locationIcon} color={Colors.primary} size={32} />
+                        <View style={styles.rowText}>
+                            <Text style={styles.rowPrimary} numberOfLines={1}>
+                                {buildingName} › {floorName}
+                                {roomInfo ? ` › ${roomInfo}` : ""}
+                            </Text>
+                            <Text style={styles.rowSecondary} numberOfLines={1}>
+                                {roomInfo ? complaint.locationType : `${complaint.locationType} · general area`}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Reporter row */}
+                    <View style={styles.row}>
+                        <IconChip name="person-outline" color={Colors.primary} size={32} />
+                        <View style={styles.rowText}>
+                            <Text style={styles.rowPrimary} numberOfLines={1}>
+                                {raisedByName}
+                            </Text>
+                            <Text style={styles.rowSecondary}>Reported by</Text>
+                        </View>
+                    </View>
+
+                    {/* Evidence photos */}
+                    {complaint.photos && complaint.photos.length > 0 && (
+                        <View style={styles.photoRow}>
+                            {complaint.photos.slice(0, 3).map((photoUrl, idx) => (
+                                <Image
+                                    key={idx}
+                                    source={{ uri: photoUrl }}
+                                    style={styles.thumbnail}
+                                />
+                            ))}
+                            {complaint.photos.length > 3 && (
+                                <View style={[styles.thumbnail, styles.morePhotos]}>
+                                    <Text style={styles.moreText}>
+                                        +{complaint.photos.length - 3}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     )}
-                </View>
-            )}
 
-            {showCost && costDetails && costDetails.totalCost > 0 && (
-                <View style={styles.costBox}>
-                    <Text style={styles.costTitle}>💰 Detailed Repair Cost:</Text>
-                    <View style={styles.costGrid}>
-                        <Text style={styles.costItem}>Labor: ₹{costDetails.laborCost}</Text>
-                        <Text style={styles.costItem}>Material: ₹{costDetails.materialCost}</Text>
-                        <Text style={styles.costItem}>Other: ₹{costDetails.otherCost}</Text>
+                    {/* Cost breakdown */}
+                    {hasCost && (
+                        <View style={styles.costPanel}>
+                            <View style={styles.costLabelRow}>
+                                <IconChip
+                                    name="cash-outline"
+                                    color={Colors.money}
+                                    size={20}
+                                />
+                                <Text style={styles.costLabel}>Repair Cost</Text>
+                                <Text style={styles.costTotal}>{inr(costDetails!.totalCost)}</Text>
+                            </View>
+
+                            <View style={styles.costGrid}>
+                                {(
+                                    [
+                                        ["Labor", costDetails!.laborCost],
+                                        ["Material", costDetails!.materialCost],
+                                        ["Other", costDetails!.otherCost],
+                                    ] as const
+                                ).map(([label, value]) => (
+                                    <View key={label} style={styles.costCell}>
+                                        <Text style={styles.costCellLabel}>{label}</Text>
+                                        <Text style={styles.costCellValue}>{inr(value || 0)}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Footer: priority */}
+                    <View style={styles.footer}>
+                        <View style={[styles.priorityPill, { backgroundColor: priority.bg }]}>
+                            <Ionicons name="flag" size={10} color={priority.fg} />
+                            <Text style={[styles.priorityText, { color: priority.fg }]}>
+                                {complaint.priority} priority
+                            </Text>
+                        </View>
+
+                        {onPress && (
+                            <View style={styles.viewLink}>
+                                <Text style={styles.viewLinkText}>Details</Text>
+                                <Ionicons
+                                    name="arrow-forward"
+                                    size={13}
+                                    color={Colors.primary}
+                                />
+                            </View>
+                        )}
                     </View>
-                    <Text style={styles.costTotal}>Total: ₹{costDetails.totalCost}</Text>
-                </View>
-            )}
+                </Wrapper>
 
-            <View style={styles.footer}>
-                <Text style={styles.raisedBy}>By: {raisedByName}</Text>
-                <Text style={[styles.priority, getPriorityStyle(complaint.priority)]}>
-                    {complaint.priority.toUpperCase()} PRIORITY
-                </Text>
+                {footer}
             </View>
-        </TouchableOpacity>
+        </View>
     );
 };
 
-function getPriorityStyle(priority: string) {
-    switch (priority) {
-        case "critical":
-            return { color: "#dc2626", fontWeight: "bold" as const };
-        case "high":
-            return { color: "#ea580c", fontWeight: "600" as const };
-        case "medium":
-            return { color: "#d97706" };
-        default:
-            return { color: "#6b7280" };
-    }
-}
-
 const styles = StyleSheet.create({
-    card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 14,
-        padding: 16,
-        marginVertical: 8,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: "#f3f4f6",
+    shadowWrap: {
+        borderRadius: Radius.xxl,
+        backgroundColor: Colors.surface,
+        marginBottom: 14,
+        ...Shadow.card,
     },
-    header: {
+    card: {
+        borderRadius: Radius.xxl,
+        overflow: "hidden",
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+    },
+    accentBar: {
+        height: 4,
+        width: "100%",
+    },
+    inner: {
+        padding: 16,
+    },
+    topRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 8,
+        marginBottom: 10,
     },
     date: {
-        fontSize: 12,
-        color: "#9ca3af",
+        fontSize: 11,
+        fontWeight: "600",
+        color: Colors.textTertiary,
     },
     title: {
-        fontSize: 17,
-        fontWeight: "700",
-        color: "#1f2937",
-        marginBottom: 4,
+        fontSize: 16,
+        fontWeight: "800",
+        color: Colors.textPrimary,
+        letterSpacing: -0.3,
+        marginBottom: 3,
     },
     description: {
-        fontSize: 14,
-        color: "#4b5563",
-        marginBottom: 10,
+        fontSize: 13,
+        color: Colors.textSecondary,
+        lineHeight: 18,
+        marginBottom: 14,
     },
-    locationContainer: {
+    row: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#f9fafb",
-        padding: 8,
-        borderRadius: 8,
-        marginBottom: 10,
+        gap: 10,
+        marginBottom: 12,
     },
-    locationLabel: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#374151",
-        marginRight: 6,
-    },
-    locationValue: {
-        fontSize: 13,
-        color: "#2563eb",
-        fontWeight: "500",
+    rowText: {
         flex: 1,
+    },
+    rowPrimary: {
+        fontSize: 13.5,
+        fontWeight: "700",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
+    },
+    rowSecondary: {
+        fontSize: 11.5,
+        color: Colors.textTertiary,
+        fontWeight: "500",
+        marginTop: 1,
+        textTransform: "capitalize",
     },
     photoRow: {
         flexDirection: "row",
-        marginBottom: 10,
+        gap: 8,
+        marginBottom: 12,
     },
     thumbnail: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        marginRight: 8,
+        width: 58,
+        height: 58,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.borderLight,
     },
     morePhotos: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        backgroundColor: "#e5e7eb",
-        justifyContent: "center",
         alignItems: "center",
+        justifyContent: "center",
     },
     moreText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#4b5563",
+        fontSize: 13,
+        fontWeight: "800",
+        color: Colors.textSecondary,
     },
-    costBox: {
-        backgroundColor: "#f0fdf4",
-        borderColor: "#bbf7d0",
+    costPanel: {
+        backgroundColor: Colors.successLight,
         borderWidth: 1,
-        borderRadius: 10,
-        padding: 10,
+        borderColor: Colors.successBorder,
+        borderRadius: Radius.lg,
+        padding: 12,
+        marginBottom: 12,
+    },
+    costLabelRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 7,
         marginBottom: 10,
     },
-    costTitle: {
-        fontSize: 13,
+    costLabel: {
+        flex: 1,
+        fontSize: 10.5,
         fontWeight: "700",
-        color: "#15803d",
-        marginBottom: 4,
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    costTotal: {
+        fontSize: 15,
+        fontWeight: "800",
+        color: Colors.successDark,
+        letterSpacing: -0.3,
     },
     costGrid: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 4,
+        gap: 8,
     },
-    costItem: {
-        fontSize: 12,
-        color: "#166534",
+    costCell: {
+        flex: 1,
     },
-    costTotal: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#166534",
-        textAlign: "right",
+    costCellLabel: {
+        fontSize: 10,
+        fontWeight: "600",
+        color: Colors.textTertiary,
+        textTransform: "uppercase",
+        letterSpacing: 0.3,
+    },
+    costCellValue: {
+        fontSize: 12.5,
+        fontWeight: "700",
+        color: Colors.textBody,
+        marginTop: 1,
     },
     footer: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
         borderTopWidth: 1,
-        borderTopColor: "#f3f4f6",
-        paddingTop: 8,
+        borderTopColor: Colors.borderLight,
+        paddingTop: 12,
     },
-    raisedBy: {
+    priorityPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: Radius.full,
+    },
+    priorityText: {
+        fontSize: 10,
+        fontWeight: "800",
+        textTransform: "uppercase",
+        letterSpacing: 0.3,
+    },
+    viewLink: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+    },
+    viewLinkText: {
         fontSize: 12,
-        color: "#6b7280",
-    },
-    priority: {
-        fontSize: 11,
+        fontWeight: "700",
+        color: Colors.primary,
     },
 });

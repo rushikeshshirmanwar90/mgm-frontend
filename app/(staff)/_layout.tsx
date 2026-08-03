@@ -1,43 +1,47 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { tabIcon, useTabScreenOptions } from "@/components/ui";
 
 export default function StaffLayout() {
     return (
-        <Tabs
-            screenOptions={{
-                headerStyle: { backgroundColor: "#ffffff" },
-                headerTitleStyle: { fontWeight: "700", fontSize: 18 },
-                tabBarActiveTintColor: "#2563eb",
-                tabBarInactiveTintColor: "#64748b",
-                tabBarStyle: { height: 60, paddingBottom: 8, paddingTop: 6 },
-            }}
-        >
+        <Tabs screenOptions={useTabScreenOptions()}>
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Dashboard",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>🏠</Text>,
+                    title: "Home",
+                    tabBarLabel: "Home",
+                    tabBarIcon: tabIcon("home"),
                 }}
             />
             <Tabs.Screen
                 name="raise"
                 options={{
-                    title: "Raise Complaint",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>➕</Text>,
+                    title: "Report an issue",
+                    tabBarLabel: "Report",
+                    tabBarIcon: tabIcon("add-circle"),
                 }}
             />
             <Tabs.Screen
                 name="complaints"
                 options={{
-                    title: "My Complaints",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>📋</Text>,
+                    title: "My complaints",
+                    tabBarLabel: "My reports",
+                    tabBarIcon: tabIcon("document-text"),
                 }}
             />
             <Tabs.Screen
                 name="notifications"
                 options={{
-                    title: "Notifications",
-                    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>🔔</Text>,
+                    title: "Updates",
+                    tabBarLabel: "Updates",
+                    tabBarIcon: tabIcon("notifications"),
+                }}
+            />
+            <Tabs.Screen
+                name="profile"
+                options={{
+                    title: "My profile",
+                    tabBarLabel: "Profile",
+                    tabBarIcon: tabIcon("person-circle"),
                 }}
             />
         </Tabs>

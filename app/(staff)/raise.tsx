@@ -4,17 +4,32 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    TextInput,
     TouchableOpacity,
     Image,
-    ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { BuildingFloorRoomPicker } from "@/components/BuildingFloorRoomPicker";
 import { Building, Floor, Room } from "@/lib/types";
-import { apiRequest, uploadImageToCloudinary } from "@/lib/api";
+import { apiRequest, isCloudinaryConfigured, uploadImageToCloudinary } from "@/lib/api";
 import { useRouter } from "expo-router";
+import { Colors, PriorityColors, Radius } from "@/constants/theme";
+import { Banner, Button, Card, Chip, SectionTitle, TextField } from "@/components/ui";
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+const LOCATION_TYPES: { key: string; label: string; icon: IoniconName }[] = [
+    { key: "classroom", label: "Classroom", icon: "school-outline" },
+    { key: "washroom", label: "Washroom", icon: "water-outline" },
+    { key: "lab", label: "Lab", icon: "flask-outline" },
+    { key: "office", label: "Office", icon: "briefcase-outline" },
+    { key: "other", label: "Other", icon: "ellipsis-horizontal-circle-outline" },
+];
+
+const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
 export default function RaiseComplaintScreen() {
     const router = useRouter();
@@ -23,7 +38,9 @@ export default function RaiseComplaintScreen() {
     const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
-    const [locationType, setLocationType] = useState<"classroom" | "washroom" | "lab" | "office" | "other">("classroom");
+    const [locationType, setLocationType] = useState<
+        "classroom" | "washroom" | "lab" | "office" | "other"
+    >("classroom");
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [priority, setPriority] = useState<"low" | "medium" | "high" | "critical">("medium");
@@ -31,26 +48,59 @@ export default function RaiseComplaintScreen() {
     const [localPhotos, setLocalPhotos] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
-    const handlePickImage = async () => {
+    const addAssets = (result: ImagePicker.ImagePickerResult) => {
+        if (result.canceled || !result.assets) return;
+        setLocalPhotos((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+    };
+
+    /** Opens the camera so damage can be photographed on the spot. */
+    const handleTakePhoto = async () => {
         try {
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!permissionResult.granted) {
-                Alert.alert("Permission Required", "Permission to access camera roll is required!");
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert(
+                    "Camera Access Needed",
+                    "Allow camera access in Settings to photograph the damage directly."
+                );
                 return;
             }
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsMultipleSelection: true,
-                quality: 0.8,
-            });
+            addAssets(
+                await ImagePicker.launchCameraAsync({
+                    // `MediaTypeOptions` is deprecated in expo-image-picker 17;
+                    // the array form is the supported API.
+                    mediaTypes: ["images"],
+                    quality: 0.8,
+                })
+            );
+        } catch (e) {
+            console.error("Camera error", e);
+            Alert.alert("Camera Unavailable", "Could not open the camera on this device.");
+        }
+    };
 
-            if (!result.canceled && result.assets) {
-                const newUris = result.assets.map((asset) => asset.uri);
-                setLocalPhotos((prev) => [...prev, ...newUris]);
+    /** Picks existing photos from the device's library. */
+    const handlePickFromGallery = async () => {
+        try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert(
+                    "Photo Access Needed",
+                    "Allow photo library access in Settings to attach existing photos."
+                );
+                return;
             }
+
+            addAssets(
+                await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ["images"],
+                    allowsMultipleSelection: true,
+                    quality: 0.8,
+                })
+            );
         } catch (e) {
             console.error("Image pick error", e);
+            Alert.alert("Could Not Open Gallery", "Please try again.");
         }
     };
 
@@ -141,7 +191,7 @@ export default function RaiseComplaintScreen() {
             });
 
             Alert.alert(
-                "Complaint Raised! 📢",
+                "Complaint Raised",
                 "Your maintenance complaint has been submitted to the Estate Manager. You will be notified when it is resolved.",
                 [
                     {
@@ -159,300 +209,324 @@ export default function RaiseComplaintScreen() {
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.headerTitle}>Report Campus Damage 📸</Text>
-            <Text style={styles.headerSub}>
-                Select location, attach damage photo, and submit to the maintenance department.
-            </Text>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.flex}
+        >
+            <ScrollView
+                style={styles.page}
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Location */}
+                <Card accent style={styles.card}>
+                    <SectionTitle title="Where is the issue?" />
+                    <BuildingFloorRoomPicker
+                        selectedBuildingId={selectedBuilding?._id || null}
+                        selectedFloorId={selectedFloor?._id || null}
+                        selectedRoomId={selectedRoom?._id || null}
+                        onSelectBuilding={(b) => {
+                            setSelectedBuilding(b);
+                            setSelectedFloor(null);
+                            setSelectedRoom(null);
+                        }}
+                        onSelectFloor={(f) => {
+                            setSelectedFloor(f);
+                            setSelectedRoom(null);
+                        }}
+                        onSelectRoom={(r) => {
+                            setSelectedRoom(r);
+                            if (r) setLocationType(r.roomType as any);
+                        }}
+                    />
 
-            {/* Location Selector */}
-            <View style={styles.card}>
-                <BuildingFloorRoomPicker
-                    selectedBuildingId={selectedBuilding?._id || null}
-                    selectedFloorId={selectedFloor?._id || null}
-                    selectedRoomId={selectedRoom?._id || null}
-                    onSelectBuilding={(b) => {
-                        setSelectedBuilding(b);
-                        setSelectedFloor(null);
-                        setSelectedRoom(null);
-                    }}
-                    onSelectFloor={(f) => {
-                        setSelectedFloor(f);
-                        setSelectedRoom(null);
-                    }}
-                    onSelectRoom={(r) => {
-                        setSelectedRoom(r);
-                        if (r) setLocationType(r.roomType as any);
-                    }}
-                />
+                    {!selectedRoom && selectedFloor && (
+                        <View style={styles.categoryBox}>
+                            <Text style={styles.categoryLabel}>Location category</Text>
+                            <View style={styles.chipWrap}>
+                                {LOCATION_TYPES.map((t) => (
+                                    <Chip
+                                        key={t.key}
+                                        label={t.label}
+                                        icon={t.icon}
+                                        selected={locationType === t.key}
+                                        onPress={() => setLocationType(t.key as any)}
+                                    />
+                                ))}
+                            </View>
+                        </View>
+                    )}
+                </Card>
 
-                {!selectedRoom && selectedFloor && (
-                    <View style={styles.locationTypeBox}>
-                        <Text style={styles.label}>Location Category</Text>
-                        <View style={styles.typeRow}>
-                            {(["classroom", "washroom", "lab", "office", "other"] as const).map((type) => (
+                {/* Details */}
+                <Card style={styles.card}>
+                    <SectionTitle title="Issue details" />
+
+                    <TextField
+                        label="Complaint title"
+                        icon="alert-circle-outline"
+                        value={title}
+                        onChangeText={setTitle}
+                        placeholder="e.g. Broken AC switch board"
+                    />
+
+                    <TextField
+                        label="Description"
+                        icon="document-text-outline"
+                        multiline
+                        value={description}
+                        onChangeText={setDescription}
+                        placeholder="Describe what is damaged and any exact location details."
+                    />
+
+                    <Text style={styles.categoryLabel}>Priority</Text>
+                    <View style={styles.priorityRow}>
+                        {PRIORITIES.map((p) => {
+                            const active = priority === p;
+                            const tone = PriorityColors[p];
+                            return (
                                 <TouchableOpacity
-                                    key={type}
-                                    style={[styles.typeChip, locationType === type && styles.selectedTypeChip]}
-                                    onPress={() => setLocationType(type)}
+                                    key={p}
+                                    onPress={() => setPriority(p)}
+                                    activeOpacity={0.8}
+                                    style={[
+                                        styles.priorityChip,
+                                        active && {
+                                            backgroundColor: tone.bg,
+                                            borderColor: tone.fg,
+                                        },
+                                    ]}
                                 >
-                                    <Text style={[styles.typeText, locationType === type && styles.selectedTypeText]}>
-                                        {type === "washroom" ? "🚽 Washroom" : type === "classroom" ? "🏫 Classroom" : type}
+                                    <View
+                                        style={[
+                                            styles.priorityDot,
+                                            { backgroundColor: active ? tone.fg : Colors.border },
+                                        ]}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.priorityText,
+                                            active && { color: tone.fg },
+                                        ]}
+                                    >
+                                        {p}
                                     </Text>
                                 </TouchableOpacity>
-                            ))}
-                        </View>
+                            );
+                        })}
                     </View>
-                )}
-            </View>
+                </Card>
 
-            {/* Issue Details Card */}
-            <View style={styles.card}>
-                <Text style={styles.cardTitle}>Issue Details</Text>
+                {/* Photos */}
+                <Card style={styles.card}>
+                    <SectionTitle
+                        title="Damage photos"
+                        action={
+                            localPhotos.length > 0 ? (
+                                <Text style={styles.photoCount}>
+                                    {localPhotos.length} attached
+                                </Text>
+                            ) : null
+                        }
+                    />
 
-                <Text style={styles.label}>Complaint Title *</Text>
-                <TextInput
-                    style={styles.input}
-                    value={title}
-                    onChangeText={setTitle}
-                    placeholder="e.g. Broken AC switch board / Washroom pipe leakage"
-                />
+                    {/* Warn before they attach anything, rather than letting the
+                        upload fail at submit time. */}
+                    {!isCloudinaryConfigured && (
+                        <Banner
+                            tone="warning"
+                            title="Photo uploads aren't set up yet"
+                            message="You can still submit the complaint — it will just go through without photos."
+                        />
+                    )}
 
-                <Text style={styles.label}>Detailed Description *</Text>
-                <TextInput
-                    style={[styles.input, { height: 90 }]}
-                    multiline
-                    value={description}
-                    onChangeText={setDescription}
-                    placeholder="Describe what is damaged, exact location details, etc."
-                />
-
-                <Text style={styles.label}>Priority Level</Text>
-                <View style={styles.priorityRow}>
-                    {(["low", "medium", "high", "critical"] as const).map((p) => (
+                    <View style={styles.pickerRow}>
                         <TouchableOpacity
-                            key={p}
-                            style={[
-                                styles.priorityChip,
-                                priority === p && styles.selectedPriorityChip,
-                            ]}
-                            onPress={() => setPriority(p)}
+                            style={styles.pickerOption}
+                            onPress={handleTakePhoto}
+                            activeOpacity={0.8}
                         >
-                            <Text
-                                style={[
-                                    styles.priorityText,
-                                    priority === p && styles.selectedPriorityText,
-                                ]}
-                            >
-                                {p.toUpperCase()}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
-
-            {/* Photos Card */}
-            <View style={styles.card}>
-                <Text style={styles.cardTitle}>Attach Damage Photos 📷</Text>
-
-                <TouchableOpacity style={styles.photoPickerBtn} onPress={handlePickImage}>
-                    <Text style={styles.photoPickerIcon}>➕📷</Text>
-                    <Text style={styles.photoPickerText}>Tap to select photo from gallery/camera</Text>
-                </TouchableOpacity>
-
-                {localPhotos.length > 0 && (
-                    <ScrollView horizontal style={styles.photoPreviewRow}>
-                        {localPhotos.map((uri, idx) => (
-                            <View key={idx} style={styles.photoWrapper}>
-                                <Image source={{ uri }} style={styles.photoPreview} />
-                                <TouchableOpacity
-                                    style={styles.removePhotoBtn}
-                                    onPress={() => handleRemovePhoto(idx)}
-                                >
-                                    <Text style={styles.removePhotoText}>✕</Text>
-                                </TouchableOpacity>
+                            <View style={styles.pickerIcon}>
+                                <Ionicons name="camera" size={20} color={Colors.primary} />
                             </View>
-                        ))}
-                    </ScrollView>
-                )}
-            </View>
+                            <Text style={styles.pickerLabel}>Take photo</Text>
+                            <Text style={styles.pickerHint}>Use the camera</Text>
+                        </TouchableOpacity>
 
-            {/* Submit Button */}
-            <TouchableOpacity
-                style={styles.submitBtn}
-                onPress={handleSubmit}
-                disabled={submitting}
-            >
-                {submitting ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.submitBtnText}>Submit Complaint to Manager</Text>
-                )}
-            </TouchableOpacity>
-        </ScrollView>
+                        <TouchableOpacity
+                            style={styles.pickerOption}
+                            onPress={handlePickFromGallery}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.pickerIcon}>
+                                <Ionicons name="images" size={20} color={Colors.primary} />
+                            </View>
+                            <Text style={styles.pickerLabel}>From gallery</Text>
+                            <Text style={styles.pickerHint}>Pick existing</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {localPhotos.length > 0 && (
+                        <ScrollView
+                            horizontal
+                            style={styles.photoPreviewRow}
+                            showsHorizontalScrollIndicator={false}
+                        >
+                            {localPhotos.map((uri, idx) => (
+                                <View key={idx} style={styles.photoWrapper}>
+                                    <Image source={{ uri }} style={styles.photoPreview} />
+                                    <TouchableOpacity
+                                        style={styles.removePhotoBtn}
+                                        onPress={() => handleRemovePhoto(idx)}
+                                        hitSlop={6}
+                                    >
+                                        <Ionicons name="close" size={12} color="#FFFFFF" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    )}
+                </Card>
+
+                <Button
+                    label="Submit complaint"
+                    icon="paper-plane-outline"
+                    size="lg"
+                    fullWidth
+                    loading={submitting}
+                    onPress={handleSubmit}
+                />
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
+    flex: {
+        flex: 1,
+    },
+    page: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
     container: {
         padding: 16,
-        backgroundColor: "#f8fafc",
-    },
-    headerTitle: {
-        fontSize: 22,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginBottom: 4,
-    },
-    headerSub: {
-        fontSize: 13,
-        color: "#64748b",
-        marginBottom: 16,
+        paddingBottom: 36,
     },
     card: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 16,
         marginBottom: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
     },
-    cardTitle: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#1e293b",
-        marginBottom: 12,
-    },
-    label: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#475569",
-        marginBottom: 6,
-        marginTop: 6,
-    },
-    input: {
-        backgroundColor: "#f1f5f9",
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        fontSize: 14,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: "#cbd5e1",
-    },
-    locationTypeBox: {
-        marginTop: 10,
+    categoryBox: {
+        marginTop: 18,
         borderTopWidth: 1,
-        borderTopColor: "#f1f5f9",
-        paddingTop: 10,
+        borderTopColor: Colors.borderLight,
+        paddingTop: 14,
     },
-    typeRow: {
+    categoryLabel: {
+        fontSize: 11,
+        fontWeight: "700",
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 10,
+    },
+    chipWrap: {
         flexDirection: "row",
         flexWrap: "wrap",
-        gap: 6,
-    },
-    typeChip: {
-        backgroundColor: "#f1f5f9",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    selectedTypeChip: {
-        backgroundColor: "#2563eb",
-    },
-    typeText: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#475569",
-    },
-    selectedTypeText: {
-        color: "#ffffff",
+        gap: 8,
     },
     priorityRow: {
         flexDirection: "row",
-        gap: 8,
-        marginVertical: 6,
+        gap: 6,
     },
     priorityChip: {
         flex: 1,
-        backgroundColor: "#f1f5f9",
-        paddingVertical: 8,
-        borderRadius: 8,
-        alignItems: "center",
-    },
-    selectedPriorityChip: {
-        backgroundColor: "#2563eb",
-    },
-    priorityText: {
-        fontSize: 11,
-        fontWeight: "700",
-        color: "#475569",
-    },
-    selectedPriorityText: {
-        color: "#ffffff",
-    },
-    photoPickerBtn: {
-        backgroundColor: "#eff6ff",
-        borderWidth: 2,
-        borderColor: "#93c5fd",
-        borderStyle: "dashed",
-        borderRadius: 12,
-        padding: 20,
+        flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
+        gap: 5,
+        paddingVertical: 9,
+        paddingHorizontal: 4,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.borderLight,
+        borderWidth: 1,
+        borderColor: "transparent",
     },
-    photoPickerIcon: {
-        fontSize: 28,
-        marginBottom: 6,
+    priorityDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
-    photoPickerText: {
+    priorityText: {
+        fontSize: 10.5,
+        fontWeight: "800",
+        color: Colors.textSecondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.3,
+    },
+    photoCount: {
+        fontSize: 11,
+        fontWeight: "700",
+        color: Colors.primary,
+    },
+    pickerRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    pickerOption: {
+        flex: 1,
+        backgroundColor: Colors.primaryLight,
+        borderWidth: 1.5,
+        borderColor: Colors.primaryBorder,
+        borderStyle: "dashed",
+        borderRadius: Radius.lg,
+        paddingVertical: 18,
+        alignItems: "center",
+    },
+    pickerIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: Radius.md,
+        backgroundColor: "rgba(255,255,255,0.75)",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 9,
+    },
+    pickerLabel: {
         fontSize: 13,
-        color: "#1d4ed8",
-        fontWeight: "600",
+        fontWeight: "700",
+        color: Colors.primaryDark,
+    },
+    pickerHint: {
+        fontSize: 11,
+        color: Colors.primary,
+        marginTop: 2,
     },
     photoPreviewRow: {
-        flexDirection: "row",
-        marginTop: 12,
+        marginTop: 14,
     },
     photoWrapper: {
         position: "relative",
         marginRight: 10,
     },
     photoPreview: {
-        width: 80,
-        height: 80,
-        borderRadius: 10,
+        width: 78,
+        height: 78,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.borderLight,
     },
     removePhotoBtn: {
         position: "absolute",
         top: -6,
         right: -6,
-        backgroundColor: "#dc2626",
+        backgroundColor: Colors.error,
         width: 22,
         height: 22,
         borderRadius: 11,
+        alignItems: "center",
         justifyContent: "center",
-        alignItems: "center",
-    },
-    removePhotoText: {
-        color: "#ffffff",
-        fontSize: 12,
-        fontWeight: "800",
-    },
-    submitBtn: {
-        backgroundColor: "#2563eb",
-        borderRadius: 14,
-        paddingVertical: 16,
-        alignItems: "center",
-        marginBottom: 30,
-        elevation: 4,
-    },
-    submitBtnText: {
-        color: "#ffffff",
-        fontSize: 16,
-        fontWeight: "800",
+        borderWidth: 2,
+        borderColor: Colors.surface,
     },
 });

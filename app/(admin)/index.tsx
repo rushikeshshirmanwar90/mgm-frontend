@@ -1,28 +1,50 @@
 import React, { useState, useEffect } from "react";
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
-    RefreshControl,
-} from "react-native";
-import { useAuth } from "@/context/AuthContext";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, type Href } from "expo-router";
 import { apiRequest } from "@/lib/api";
 import { BuildingsResponse, Complaint, ComplaintsResponse } from "@/lib/types";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { Screen, SectionTitle, StatCard } from "@/components/ui";
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+/** Shortcuts to the sections the admin actually works in, in order of use. */
+const SHORTCUTS: { icon: IoniconName; title: string; subtitle: string; href: Href }[] = [
+    {
+        icon: "pie-chart",
+        title: "Spending reports",
+        subtitle: "Labor, material and other repair costs",
+        href: "/(admin)/reports",
+    },
+    {
+        icon: "cash",
+        title: "All complaints",
+        subtitle: "Every issue on record with its cost",
+        href: "/(admin)/complaints",
+    },
+    {
+        icon: "business",
+        title: "Buildings & rooms",
+        subtitle: "Manage the campus structure",
+        href: "/(admin)/buildings",
+    },
+    {
+        icon: "people",
+        title: "People",
+        subtitle: "Staff, managers and access",
+        href: "/(admin)/users",
+    },
+];
 
 export default function AdminDashboard() {
-    const { user, logout } = useAuth();
+    const router = useRouter();
 
     const [stats, setStats] = useState({
         totalComplaints: 0,
         pending: 0,
         in_progress: 0,
         resolved: 0,
-        laborCost: 0,
-        materialCost: 0,
-        otherCost: 0,
-        grandTotalCost: 0,
         totalBuildings: 0,
     });
     const [refreshing, setRefreshing] = useState(false);
@@ -41,18 +63,6 @@ export default function AdminDashboard() {
             const in_progress = complaints.filter((c) => c.status === "in_progress").length;
             const resolved = complaints.filter((c) => c.status === "resolved").length;
 
-            let labor = 0;
-            let material = 0;
-            let other = 0;
-
-            complaints.forEach((c) => {
-                if (c.costDetails) {
-                    labor += c.costDetails.laborCost || 0;
-                    material += c.costDetails.materialCost || 0;
-                    other += c.costDetails.otherCost || 0;
-                }
-            });
-
             const bData = await apiRequest<BuildingsResponse>("/buildings");
             const totalBuildings = (bData.buildings || []).length;
 
@@ -61,10 +71,6 @@ export default function AdminDashboard() {
                 pending,
                 in_progress,
                 resolved,
-                laborCost: labor,
-                materialCost: material,
-                otherCost: other,
-                grandTotalCost: labor + material + other,
                 totalBuildings,
             });
         } catch (e) {
@@ -75,189 +81,129 @@ export default function AdminDashboard() {
     };
 
     return (
-        <ScrollView
-            style={styles.container}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={loadAdminData} />
-            }
-        >
-            {/* Admin Header */}
-            <View style={styles.headerCard}>
-                <View>
-                    <Text style={styles.greeting}>Administrator Portal 👑</Text>
-                    <Text style={styles.userName}>{user?.name}</Text>
-                    <Text style={styles.userRole}>MGM Campus Executive & Financial Controller</Text>
-                </View>
-                <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Financial Overview Card */}
-            <Text style={styles.sectionHeader}>Campus Maintenance Expenditure</Text>
-            <View style={styles.costSummaryCard}>
-                <Text style={styles.costSummaryTitle}>Grand Total Repair Costs</Text>
-                <Text style={styles.costSummaryNum}>₹{stats.grandTotalCost.toLocaleString()}</Text>
-
-                <View style={styles.costBreakdownRow}>
-                    <View style={styles.costBoxItem}>
-                        <Text style={styles.costBoxLabel}>Labor Costs</Text>
-                        <Text style={styles.costBoxNum}>₹{stats.laborCost.toLocaleString()}</Text>
-                    </View>
-
-                    <View style={styles.costBoxItem}>
-                        <Text style={styles.costBoxLabel}>Material Costs</Text>
-                        <Text style={styles.costBoxNum}>₹{stats.materialCost.toLocaleString()}</Text>
-                    </View>
-
-                    <View style={styles.costBoxItem}>
-                        <Text style={styles.costBoxLabel}>Other Expenses</Text>
-                        <Text style={styles.costBoxNum}>₹{stats.otherCost.toLocaleString()}</Text>
-                    </View>
-                </View>
-            </View>
-
-            {/* System Overview Grid */}
-            <Text style={styles.sectionHeader}>Campus Infrastructure Overview</Text>
+        <Screen scroll refreshing={refreshing} onRefresh={loadAdminData}>
+            {/* Infrastructure. Spend now lives entirely in the Reports tab, so
+                this screen stays a plain count of what is on campus. */}
+            <SectionTitle title="Campus overview" />
             <View style={styles.statsGrid}>
-                <View style={[styles.statBox, { backgroundColor: "#fce7f3" }]}>
-                    <Text style={[styles.statNum, { color: "#be185d" }]}>{stats.totalBuildings}</Text>
-                    <Text style={styles.statLbl}>Active Buildings</Text>
-                </View>
-
-                <View style={[styles.statBox, { backgroundColor: "#fef3c7" }]}>
-                    <Text style={[styles.statNum, { color: "#d97706" }]}>{stats.pending}</Text>
-                    <Text style={styles.statLbl}>Pending Issues</Text>
-                </View>
-
-                <View style={[styles.statBox, { backgroundColor: "#dbeafe" }]}>
-                    <Text style={[styles.statNum, { color: "#2563eb" }]}>{stats.in_progress}</Text>
-                    <Text style={styles.statLbl}>In Progress</Text>
-                </View>
-
-                <View style={[styles.statBox, { backgroundColor: "#dcfce7" }]}>
-                    <Text style={[styles.statNum, { color: "#16a34a" }]}>{stats.resolved}</Text>
-                    <Text style={styles.statLbl}>Resolved 🎉</Text>
-                </View>
+                <StatCard
+                    icon="document-text-outline"
+                    color={Colors.primary}
+                    value={stats.totalComplaints}
+                    label="Total complaints"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="business-outline"
+                    color={Colors.primary}
+                    value={stats.totalBuildings}
+                    label="Active buildings"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="time-outline"
+                    color={Colors.warning}
+                    value={stats.pending}
+                    label="Pending issues"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="construct-outline"
+                    color={Colors.textSecondary}
+                    value={stats.in_progress}
+                    label="In progress"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="checkmark-done-outline"
+                    color={Colors.success}
+                    value={stats.resolved}
+                    label="Resolved"
+                    style={styles.statCard}
+                />
             </View>
-        </ScrollView>
+
+            <SectionTitle title="Manage" style={styles.manageTitle} />
+            <View style={styles.shortcutCard}>
+                {SHORTCUTS.map((item, i) => (
+                    <TouchableOpacity
+                        key={item.title}
+                        style={[styles.shortcutRow, i > 0 && styles.shortcutDivided]}
+                        onPress={() => router.push(item.href)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.shortcutIcon}>
+                            <Ionicons name={item.icon} size={17} color={Colors.primary} />
+                        </View>
+                        <View style={styles.shortcutText}>
+                            <Text style={styles.shortcutTitle}>{item.title}</Text>
+                            <Text style={styles.shortcutSubtitle} numberOfLines={1}>
+                                {item.subtitle}
+                            </Text>
+                        </View>
+                        <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color={Colors.textTertiary}
+                        />
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </Screen>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#f8fafc",
-        padding: 16,
-    },
-    headerCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 16,
-        padding: 18,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        elevation: 2,
-    },
-    greeting: {
-        fontSize: 13,
-        color: "#64748b",
-        fontWeight: "600",
-    },
-    userName: {
-        fontSize: 20,
-        fontWeight: "800",
-        color: "#0f172a",
-        marginTop: 2,
-    },
-    userRole: {
-        fontSize: 12,
-        color: "#be185d",
-        fontWeight: "600",
-        marginTop: 2,
-    },
-    logoutBtn: {
-        backgroundColor: "#fee2e2",
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    logoutText: {
-        color: "#dc2626",
-        fontSize: 12,
-        fontWeight: "700",
-    },
-    sectionHeader: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#1e293b",
-        marginBottom: 12,
-        marginTop: 6,
-    },
-    costSummaryCard: {
-        backgroundColor: "#831843",
-        borderRadius: 18,
-        padding: 20,
-        marginBottom: 20,
-        elevation: 4,
-    },
-    costSummaryTitle: {
-        fontSize: 13,
-        color: "#fbcfe8",
-        fontWeight: "600",
-    },
-    costSummaryNum: {
-        fontSize: 32,
-        fontWeight: "800",
-        color: "#ffffff",
-        marginVertical: 4,
-    },
-    costBreakdownRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.2)",
-        paddingTop: 14,
-        marginTop: 10,
-    },
-    costBoxItem: {
-        flex: 1,
-    },
-    costBoxLabel: {
-        fontSize: 11,
-        color: "#fbcfe8",
-    },
-    costBoxNum: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#ffffff",
-        marginTop: 2,
-    },
     statsGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
         gap: 10,
-        marginBottom: 20,
     },
-    statBox: {
-        width: "48%",
-        borderRadius: 14,
-        padding: 14,
+    statCard: {
+        width: "47.5%",
+        flexGrow: 1,
+    },
+    manageTitle: {
+        marginTop: 24,
+    },
+    shortcutCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.xl,
+        borderWidth: 1,
+        borderColor: Colors.borderCard,
+        paddingHorizontal: 16,
+        ...Shadow.sm,
+    },
+    shortcutRow: {
+        flexDirection: "row",
         alignItems: "center",
+        gap: 12,
+        paddingVertical: 14,
     },
-    statNum: {
-        fontSize: 22,
-        fontWeight: "800",
+    shortcutDivided: {
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
     },
-    statLbl: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#374151",
+    shortcutIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.primaryLight,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    shortcutText: {
+        flex: 1,
+    },
+    shortcutTitle: {
+        fontSize: 13.5,
+        fontWeight: "700",
+        color: Colors.textPrimary,
+        letterSpacing: -0.2,
+    },
+    shortcutSubtitle: {
+        fontSize: 11.5,
+        color: Colors.textSecondary,
         marginTop: 2,
     },
 });
