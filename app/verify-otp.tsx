@@ -14,15 +14,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Banner, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 
+/**
+ * Standalone verification for accounts that already exist but were never
+ * confirmed — reached from login. New sign-ups verify inline on the register
+ * screen and never land here.
+ */
 export default function VerifyOTPScreen() {
     const { verifyOTP, resendOTP } = useAuth();
     const router = useRouter();
-    const params = useLocalSearchParams<{ email: string; devOtp?: string }>();
+    const params = useLocalSearchParams<{ email: string }>();
 
-    const [otp, setOtp] = useState(params.devOtp || "");
-    const [devOtp, setDevOtp] = useState(params.devOtp);
+    const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     const [focused, setFocused] = useState(false);
@@ -60,12 +64,7 @@ export default function VerifyOTPScreen() {
         setResending(true);
         try {
             const res = await resendOTP(params.email || "");
-            // In development the backend echoes the code back so the flow can be
-            // tested without a configured SMTP server.
-            if (typeof res.otp === "string") {
-                setDevOtp(res.otp);
-                setOtp(res.otp);
-            }
+            setOtp("");
             Alert.alert("Code Sent", (res.message as string) || "A new code is on its way.");
         } catch (error) {
             Alert.alert(
@@ -94,19 +93,10 @@ export default function VerifyOTPScreen() {
                         <Text style={styles.emailText}>{params.email || "your email"}</Text>
                     </Text>
 
-                    {devOtp && (
-                        <Banner
-                            tone="warning"
-                            icon="flash"
-                            title={`Dev mode code: ${devOtp}`}
-                            style={styles.devBanner}
-                        />
-                    )}
-
                     <TextInput
                         style={[styles.otpInput, focused && styles.otpInputFocused]}
                         value={otp}
-                        onChangeText={setOtp}
+                        onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, ""))}
                         onFocus={() => setFocused(true)}
                         onBlur={() => setFocused(false)}
                         placeholder="000000"
@@ -193,9 +183,6 @@ const styles = StyleSheet.create({
     emailText: {
         fontWeight: "700",
         color: Colors.primary,
-    },
-    devBanner: {
-        width: "100%",
     },
     otpInput: {
         backgroundColor: Colors.borderLight,

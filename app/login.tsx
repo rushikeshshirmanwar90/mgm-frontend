@@ -4,7 +4,6 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
     Alert,
     ScrollView,
     KeyboardAvoidingView,
@@ -18,26 +17,13 @@ import { useRouter } from "expo-router";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import { Button, TextField } from "@/components/ui";
 
-type DemoRole = "staff" | "manager" | "admin";
-
-const DEMO_ROLES: {
-    role: DemoRole;
-    label: string;
-    icon: React.ComponentProps<typeof Ionicons>["name"];
-}[] = [
-    { role: "staff", label: "Staff", icon: "person-outline" },
-    { role: "manager", label: "Manager", icon: "briefcase-outline" },
-    { role: "admin", label: "Admin", icon: "shield-checkmark-outline" },
-];
-
 export default function LoginScreen() {
-    const { login, seedDatabase } = useAuth();
+    const { login } = useAuth();
     const router = useRouter();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const [seeding, setSeeding] = useState(false);
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -48,6 +34,16 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             const user = await login(email, password);
+
+            // Pending staff are let in deliberately, so say why the app looks
+            // half-empty before they go hunting for the missing Report tab.
+            if (user.role === "staff" && !user.isApproved) {
+                Alert.alert(
+                    "Registration not approved yet",
+                    "You're signed in, but the Estate Manager hasn't approved your registration yet. You won't be able to report issues until they do — we'll email you as soon as it's reviewed."
+                );
+            }
+
             if (user.role === "admin") router.replace("/(admin)");
             else if (user.role === "manager") router.replace("/(manager)");
             else router.replace("/(staff)");
@@ -71,36 +67,6 @@ export default function LoginScreen() {
             }
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSeedAndFill = async (role: DemoRole) => {
-        setSeeding(true);
-        try {
-            await seedDatabase();
-            if (role === "admin") {
-                setEmail("admin@mgm.edu");
-                setPassword("admin123");
-            } else if (role === "manager") {
-                setEmail("manager@mgm.edu");
-                setPassword("manager123");
-            } else {
-                setEmail("staff@mgm.edu");
-                setPassword("staff123");
-            }
-            Alert.alert(
-                "Database Seeded",
-                `Pre-filled ${role.toUpperCase()} credentials! Click Sign In.`
-            );
-        } catch (e) {
-            Alert.alert(
-                "Could Not Seed",
-                e instanceof Error
-                    ? e.message
-                    : "Seeding failed. Is the backend running in development mode?"
-            );
-        } finally {
-            setSeeding(false);
         }
     };
 
@@ -154,6 +120,14 @@ export default function LoginScreen() {
                             autoCapitalize="none"
                         />
 
+                        <TouchableOpacity
+                            style={styles.forgotPassBtn}
+                            onPress={() => router.push("/forgot-password")}
+                            hitSlop={8}
+                        >
+                            <Text style={styles.forgotPassText}>Forgot password?</Text>
+                        </TouchableOpacity>
+
                         <Button
                             label="Sign In"
                             icon="arrow-forward"
@@ -174,35 +148,6 @@ export default function LoginScreen() {
                                 <Text style={styles.registerLink}> Register here</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-
-                    {/* Demo credentials */}
-                    <View style={styles.demoCard}>
-                        <View style={styles.demoHeader}>
-                            <Ionicons name="flash" size={14} color={Colors.warningDark} />
-                            <Text style={styles.demoTitle}>Quick demo access</Text>
-                        </View>
-                        <Text style={styles.demoSubtitle}>
-                            Seeds sample buildings, floors, rooms and users, then fills the form.
-                        </Text>
-
-                        {seeding ? (
-                            <ActivityIndicator color={Colors.primary} style={styles.demoSpinner} />
-                        ) : (
-                            <View style={styles.demoBtnRow}>
-                                {DEMO_ROLES.map(({ role, label, icon }) => (
-                                    <TouchableOpacity
-                                        key={role}
-                                        style={styles.demoBtn}
-                                        onPress={() => handleSeedAndFill(role)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Ionicons name={icon} size={16} color={Colors.primary} />
-                                        <Text style={styles.demoBtnText}>{label}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -271,6 +216,16 @@ const styles = StyleSheet.create({
         marginTop: 3,
         marginBottom: 20,
     },
+    forgotPassBtn: {
+        alignSelf: "flex-end",
+        marginTop: 4,
+        marginBottom: 16,
+    },
+    forgotPassText: {
+        fontSize: 12.5,
+        fontWeight: "600",
+        color: Colors.primary,
+    },
     signInBtn: {
         marginTop: 4,
     },
@@ -291,56 +246,5 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: "700",
         color: Colors.primary,
-    },
-    demoCard: {
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.lg,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        borderStyle: "dashed",
-    },
-    demoHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-    },
-    demoTitle: {
-        fontSize: 11.5,
-        fontWeight: "700",
-        color: Colors.textSecondary,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-    demoSubtitle: {
-        fontSize: 11.5,
-        color: Colors.textTertiary,
-        marginTop: 4,
-        marginBottom: 12,
-        lineHeight: 16,
-    },
-    demoSpinner: {
-        marginVertical: 10,
-    },
-    demoBtnRow: {
-        flexDirection: "row",
-        gap: 8,
-    },
-    demoBtn: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        paddingVertical: 10,
-        borderRadius: Radius.md,
-        backgroundColor: Colors.primaryLight,
-        borderWidth: 1,
-        borderColor: Colors.primaryBorder,
-    },
-    demoBtnText: {
-        fontSize: 12,
-        fontWeight: "700",
-        color: Colors.primaryDark,
     },
 });

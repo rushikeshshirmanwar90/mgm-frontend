@@ -1,23 +1,27 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
+    TextInput,
     TouchableOpacity,
     Image,
     Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { BuildingFloorRoomPicker } from "@/components/BuildingFloorRoomPicker";
+import { ApprovalStatusNotice } from "@/components/ApprovalStatusNotice";
 import { Building, Floor, Room } from "@/lib/types";
-import { apiRequest, isCloudinaryConfigured, uploadImageToCloudinary } from "@/lib/api";
+import { apiRequest, uploadImageToCloudinary } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { Colors, PriorityColors, Radius } from "@/constants/theme";
-import { Banner, Button, Card, Chip, SectionTitle, TextField } from "@/components/ui";
+import { Button, Card, Chip, Screen, SectionTitle, TextField } from "@/components/ui";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -33,6 +37,7 @@ const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
 export default function RaiseComplaintScreen() {
     const router = useRouter();
+    const { user } = useAuth();
 
     const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
     const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
@@ -47,6 +52,34 @@ export default function RaiseComplaintScreen() {
 
     const [localPhotos, setLocalPhotos] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
+
+    const scrollRef = useRef<ScrollView>(null);
+    const descriptionRef = useRef<TextInput>(null);
+    /**
+     * Offset of the details card inside the scroll content. The card is a direct
+     * child of the content container, so `layout.y` is already the value
+     * `scrollTo` wants — no measuring against native handles needed.
+     */
+    const detailsCardY = useRef(0);
+
+    /**
+     * Lifts the details card to the top of the viewport when one of its inputs
+     * takes focus.
+     *
+     * Keyboard avoidance only pads the container — it never scrolls — so on a
+     * short screen the description box would otherwise sit behind the keyboard
+     * with no way to see what you're typing.
+     */
+    const handleDetailsFocus = () => {
+        // Deferred a beat: the keyboard frame, and the content inset derived
+        // from it, aren't applied until after the focus event fires.
+        setTimeout(() => {
+            scrollRef.current?.scrollTo({
+                y: Math.max(detailsCardY.current - 12, 0),
+                animated: true,
+            });
+        }, 120);
+    };
 
     const addAssets = (result: ImagePicker.ImagePickerResult) => {
         if (result.canceled || !result.assets) return;
@@ -109,6 +142,10 @@ export default function RaiseComplaintScreen() {
     };
 
     const handleSubmit = async () => {
+        // Get the keyboard out of the way before any alert or navigation lands,
+        // so a validation message isn't half-covered by it.
+        Keyboard.dismiss();
+
         if (!selectedBuilding || !selectedFloor) {
             Alert.alert("Location Required", "Please select Building and Floor.");
             return;
@@ -208,15 +245,37 @@ export default function RaiseComplaintScreen() {
         }
     };
 
+    // The tab is removed for pending staff, so this is belt-and-braces for a
+    // deep link or a stale navigator — and it explains itself rather than
+    // rendering a form whose submit is guaranteed to 403.
+    if (!user?.isApproved) {
+        return (
+            <Screen scroll>
+                <ApprovalStatusNotice />
+            </Screen>
+        );
+    }
+
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            // iOS gets its keyboard inset natively from the ScrollView below,
+            // which also scrolls the focused input into view. Padding here as
+            // well would shift the form by twice the keyboard height, so this
+            // wrapper only does the work on Android.
+            behavior="padding"
+            enabled={Platform.OS === "android"}
             style={styles.flex}
         >
             <ScrollView
+                ref={scrollRef}
                 style={styles.page}
                 contentContainerStyle={styles.container}
+                // "handled" lets a tap on a chip or button go through while the
+                // keyboard is open, instead of being eaten by the dismiss.
                 keyboardShouldPersistTaps="handled"
+                // Swipe the keyboard away without hunting for a Done key.
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Location */}
@@ -260,63 +319,84 @@ export default function RaiseComplaintScreen() {
                 </Card>
 
                 {/* Details */}
-                <Card style={styles.card}>
-                    <SectionTitle title="Issue details" />
+                <View
+                    onLayout={(e) => {
+                        detailsCardY.current = e.nativeEvent.layout.y;
+                    }}
+                >
+                    <Card style={styles.card}>
+                        <SectionTitle title="Issue details" />
 
-                    <TextField
-                        label="Complaint title"
-                        icon="alert-circle-outline"
-                        value={title}
-                        onChangeText={setTitle}
-                        placeholder="e.g. Broken AC switch board"
-                    />
+                        <TextField
+                            label="Complaint title"
+                            icon="alert-circle-outline"
+                            value={title}
+                            onChangeText={setTitle}
+                            placeholder="e.g. Broken AC switch board"
+                            onFocus={handleDetailsFocus}
+                            returnKeyType="next"
+                            // Hand off to the description without the keyboard
+                            // closing and reopening in between.
+                            submitBehavior="submit"
+                            onSubmitEditing={() => descriptionRef.current?.focus()}
+                        />
 
-                    <TextField
-                        label="Description"
-                        icon="document-text-outline"
-                        multiline
-                        value={description}
-                        onChangeText={setDescription}
-                        placeholder="Describe what is damaged and any exact location details."
-                    />
+                        <TextField
+                            ref={descriptionRef}
+                            label="Description"
+                            icon="document-text-outline"
+                            multiline
+                            value={description}
+                            onChangeText={setDescription}
+                            placeholder="Describe what is damaged and any exact location details."
+                            onFocus={handleDetailsFocus}
+                            // Return inserts a line break here rather than
+                            // ending input — descriptions run to a few lines.
+                            submitBehavior="newline"
+                        />
 
-                    <Text style={styles.categoryLabel}>Priority</Text>
-                    <View style={styles.priorityRow}>
-                        {PRIORITIES.map((p) => {
-                            const active = priority === p;
-                            const tone = PriorityColors[p];
-                            return (
-                                <TouchableOpacity
-                                    key={p}
-                                    onPress={() => setPriority(p)}
-                                    activeOpacity={0.8}
-                                    style={[
-                                        styles.priorityChip,
-                                        active && {
-                                            backgroundColor: tone.bg,
-                                            borderColor: tone.fg,
-                                        },
-                                    ]}
-                                >
-                                    <View
+                        <Text style={styles.categoryLabel}>Priority</Text>
+                        <View style={styles.priorityRow}>
+                            {PRIORITIES.map((p) => {
+                                const active = priority === p;
+                                const tone = PriorityColors[p];
+                                return (
+                                    <TouchableOpacity
+                                        key={p}
+                                        onPress={() => setPriority(p)}
+                                        activeOpacity={0.8}
                                         style={[
-                                            styles.priorityDot,
-                                            { backgroundColor: active ? tone.fg : Colors.border },
-                                        ]}
-                                    />
-                                    <Text
-                                        style={[
-                                            styles.priorityText,
-                                            active && { color: tone.fg },
+                                            styles.priorityChip,
+                                            active && {
+                                                backgroundColor: tone.bg,
+                                                borderColor: tone.fg,
+                                            },
                                         ]}
                                     >
-                                        {p}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </Card>
+                                        <View
+                                            style={[
+                                                styles.priorityDot,
+                                                {
+                                                    backgroundColor: active
+                                                        ? tone.fg
+                                                        : Colors.border,
+                                                },
+                                            ]}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.priorityText,
+                                                active && { color: tone.fg },
+                                            ]}
+                                        >
+                                            {p}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </Card>
+                </View>
 
                 {/* Photos */}
                 <Card style={styles.card}>
@@ -330,16 +410,6 @@ export default function RaiseComplaintScreen() {
                             ) : null
                         }
                     />
-
-                    {/* Warn before they attach anything, rather than letting the
-                        upload fail at submit time. */}
-                    {!isCloudinaryConfigured && (
-                        <Banner
-                            tone="warning"
-                            title="Photo uploads aren't set up yet"
-                            message="You can still submit the complaint — it will just go through without photos."
-                        />
-                    )}
 
                     <View style={styles.pickerRow}>
                         <TouchableOpacity
@@ -412,7 +482,9 @@ const styles = StyleSheet.create({
     },
     container: {
         padding: 16,
-        paddingBottom: 36,
+        // Deep enough that the Submit button clears the keyboard once the
+        // details card has been scrolled up to meet it.
+        paddingBottom: 56,
     },
     card: {
         marginBottom: 16,

@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { apiRequest } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Complaint, ComplaintsResponse, NotificationsResponse } from "@/lib/types";
 import { ComplaintCard } from "@/components/ComplaintCard";
-import { Colors, Radius, Shadow } from "@/constants/theme";
+import { ApprovalStatusNotice } from "@/components/ApprovalStatusNotice";
+import { Colors } from "@/constants/theme";
 import {
     Banner,
     EmptyState,
-    HowItWorks,
     Screen,
     SectionTitle,
     StatCard,
@@ -17,15 +18,22 @@ import {
 
 export default function StaffDashboard() {
     const router = useRouter();
+    const { user, refreshUser } = useAuth();
 
     const [recentComplaints, setRecentComplaints] = useState<Complaint[]>([]);
     const [stats, setStats] = useState({ pending: 0, in_progress: 0, resolved: 0 });
     const [unreadNotifs, setUnreadNotifs] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
 
+    const isApproved = !!user?.isApproved;
+
     const loadDashboardData = useCallback(async () => {
         setRefreshing(true);
         try {
+            // Pull the account down too, so a pull-to-refresh is enough to
+            // notice an approval that has just landed.
+            await refreshUser();
+
             const data = await apiRequest<ComplaintsResponse>("/complaints");
             const complaints: Complaint[] = data.complaints || [];
             setRecentComplaints(complaints.slice(0, 3));
@@ -42,32 +50,24 @@ export default function StaffDashboard() {
         } finally {
             setRefreshing(false);
         }
-    }, []);
+    }, [refreshUser]);
 
     useEffect(() => {
         loadDashboardData();
     }, [loadDashboardData]);
 
+    // Until they're approved there is nothing to count and nothing to report,
+    // so the status card is the whole screen rather than a note above empty tiles.
+    if (!isApproved) {
+        return (
+            <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
+                <ApprovalStatusNotice />
+            </Screen>
+        );
+    }
+
     return (
         <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
-            {/* Primary action */}
-            <TouchableOpacity
-                style={styles.actionCard}
-                onPress={() => router.push("/(staff)/raise")}
-                activeOpacity={0.9}
-            >
-                <View style={styles.actionIcon}>
-                    <Ionicons name="camera" size={22} color="#FFFFFF" />
-                </View>
-                <View style={styles.actionText}>
-                    <Text style={styles.actionTitle}>Report damage</Text>
-                    <Text style={styles.actionSubtitle}>
-                        Attach a photo and pick the building, floor and room
-                    </Text>
-                </View>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-
             {unreadNotifs > 0 && (
                 <Banner
                     tone="info"
@@ -77,10 +77,6 @@ export default function StaffDashboard() {
                     onPress={() => router.push("/(staff)/notifications")}
                 />
             )}
-
-            {/* Orientation — this app is used rarely, so it re-explains itself */}
-            <SectionTitle title="How it works" />
-            <HowItWorks />
 
             {/* Stats */}
             <SectionTitle title="My complaints so far" />
@@ -131,7 +127,7 @@ export default function StaffDashboard() {
                 <EmptyState
                     icon="cube-outline"
                     title="No complaints yet"
-                    message="Tap “Report damage” above to submit your first issue."
+                    message="Use the Report tab below to submit your first issue."
                 />
             ) : (
                 recentComplaints.map((item) => (
@@ -147,39 +143,6 @@ export default function StaffDashboard() {
 }
 
 const styles = StyleSheet.create({
-    actionCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        backgroundColor: Colors.primary,
-        borderRadius: Radius.xxl,
-        padding: 16,
-        marginBottom: 20,
-        ...Shadow.lg,
-    },
-    actionIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: Radius.lg,
-        backgroundColor: "rgba(255,255,255,0.2)",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    actionText: {
-        flex: 1,
-    },
-    actionTitle: {
-        fontSize: 16,
-        fontWeight: "800",
-        color: "#FFFFFF",
-        letterSpacing: -0.3,
-    },
-    actionSubtitle: {
-        fontSize: 11.5,
-        color: "#D5E7F8",
-        marginTop: 2,
-        lineHeight: 16,
-    },
     statsRow: {
         flexDirection: "row",
         gap: 8,
@@ -203,3 +166,4 @@ const styles = StyleSheet.create({
         color: Colors.primary,
     },
 });
+

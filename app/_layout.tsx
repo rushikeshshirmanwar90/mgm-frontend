@@ -7,8 +7,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { UserRole } from "@/lib/types";
 import { Colors } from "@/constants/theme";
 
-/** Routes reachable without being signed in. */
-const PUBLIC_ROUTES = ["login", "register", "verify-otp"];
+/**
+ * Routes reachable without being signed in.
+ *
+ * Password recovery belongs here for the same reason login does: the user by
+ * definition cannot authenticate yet. Leaving it out made the guard below
+ * replace the screen with /login the instant it mounted, so tapping "Forgot
+ * password?" appeared to do nothing at all.
+ */
+const PUBLIC_ROUTES = ["login", "register", "verify-otp", "forgot-password"];
 
 /**
  * The route group that owns each role's screens. Left `as const` rather than
@@ -93,6 +100,7 @@ function RootLayoutNav() {
             <Stack.Screen name="login" />
             <Stack.Screen name="register" />
             <Stack.Screen name="verify-otp" />
+            <Stack.Screen name="forgot-password" />
             <Stack.Screen name="(staff)" />
             <Stack.Screen name="(manager)" />
             <Stack.Screen name="(admin)" />

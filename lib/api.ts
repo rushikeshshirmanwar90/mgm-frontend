@@ -18,7 +18,7 @@ export const USER_KEY = "mgm_user";
  *     emulator).
  */
 function resolveBaseUrl(): string {
-    const fromEnv = "http://10.149.126.23:3000";
+    const fromEnv = "http://10.188.124.135:3000";
     if (fromEnv) {
         return `${fromEnv.replace(/\/+$/, "")}/api`;
     }
@@ -122,27 +122,26 @@ export async function apiRequest<T = Record<string, unknown>>(
     return data as T;
 }
 
-const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-export const isCloudinaryConfigured = Boolean(
-    CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET
-);
+// ---- Cloudinary ----
+// Written straight into the source, the same way the real-estate project does it
+// (components/functions/image-handling.tsx and the Xsite material/bill-upload
+// route there both hardcode this cloud and preset).
+//
+// Nothing is given away by that. The preset is an UNSIGNED one, which is exactly
+// what makes it publishable — the API secret is never used by the app. And these
+// were EXPO_PUBLIC_* values before, which Expo inlines into the JS bundle at
+// build time regardless, so the .env indirection bought no secrecy at all — only
+// a setup step that had never been done (there was no .env here, so photo
+// uploads were silently disabled).
+const CLOUDINARY_CLOUD_NAME = "dlcq8i2sc";
+const CLOUDINARY_UPLOAD_PRESET = "realEstate";
 
 /**
  * Uploads a local image URI to Cloudinary and returns the hosted URL.
  *
- * The cloud name and (unsigned) upload preset come from the environment — they
- * used to be hardcoded to a preset borrowed from an unrelated real-estate
- * project, which meant every build shipped someone else's upload target.
+ * Targets the cloud and unsigned preset configured at the top of this file.
  */
 export async function uploadImageToCloudinary(uri: string): Promise<string> {
-    if (!isCloudinaryConfigured) {
-        throw new Error(
-            "Image uploads are not configured. Set EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME and EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET in mgm-frontend/.env"
-        );
-    }
-
     const formData = new FormData();
 
     if (Platform.OS === "web") {
@@ -157,7 +156,7 @@ export async function uploadImageToCloudinary(uri: string): Promise<string> {
         } as unknown as Blob);
     }
 
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET!);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
     const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
