@@ -120,6 +120,7 @@ export const Shadow = {
  */
 export const StatusColors = {
   pending:     { fg: Colors.warningDark, bg: Colors.warningLight, dot: Colors.warning, border: Colors.warningBorder, label: 'Pending' },
+  on_hold:     { fg: '#475569',          bg: Colors.borderLight,   dot: Colors.textSecondary, border: Colors.border, label: 'On hold' },
   in_progress: { fg: Colors.primaryDark, bg: Colors.primaryLight, dot: Colors.primary, border: Colors.primaryBorder, label: 'In Progress' },
   resolved:    { fg: Colors.successDark, bg: Colors.successLight, dot: Colors.success, border: Colors.successBorder, label: 'Resolved' },
   rejected:    { fg: Colors.errorDark,   bg: Colors.errorLight,   dot: Colors.error,   border: Colors.errorBorder,   label: 'Rejected' },

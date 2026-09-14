@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
-import { tabIcon, useTabScreenOptions } from "@/components/ui";
+import { renderTabBar, tabIcon, useTabScreenOptions } from "@/components/ui";
 
 export default function StaffLayout() {
     const { user } = useAuth();
@@ -12,7 +12,7 @@ export default function StaffLayout() {
     const canRaise = !!user?.isApproved;
 
     return (
-        <Tabs screenOptions={useTabScreenOptions()}>
+        <Tabs tabBar={renderTabBar} screenOptions={useTabScreenOptions()}>
             <Tabs.Screen
                 name="index"
                 options={{

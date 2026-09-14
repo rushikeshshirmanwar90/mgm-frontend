@@ -11,6 +11,7 @@ import { Button, ChipGroup, EmptyState, SearchBar } from "@/components/ui";
 const STATUS_FILTERS = [
     { key: "all", label: "All" },
     { key: "pending", label: "Needs action" },
+    { key: "on_hold", label: "On hold" },
     { key: "in_progress", label: "In progress" },
     { key: "resolved", label: "Resolved" },
 ] as const;
@@ -104,7 +105,7 @@ export default function ManagerComplaintsScreen() {
                     // three competing actions. Everything else lives on the
                     // detail screen, which has room to explain itself.
                     const nextStep =
-                        item.status === "pending"
+                        item.status === "pending" || item.status === "on_hold"
                             ? { label: "Start work", status: "in_progress", icon: "construct-outline" as const }
                             : item.status === "in_progress"
                               ? { label: "Mark resolved", status: "resolved", icon: "checkmark-circle-outline" as const }
@@ -122,7 +123,7 @@ export default function ManagerComplaintsScreen() {
                                             label={nextStep.label}
                                             icon={nextStep.icon}
                                             variant={
-                                                item.status === "pending" ? "secondary" : "primary"
+                                                item.status === "in_progress" ? "primary" : "secondary"
                                             }
                                             size="sm"
                                             loading={busyId === item._id}

@@ -11,6 +11,7 @@ import { ChipGroup, EmptyState, SearchBar } from "@/components/ui";
 const STATUS_FILTERS = [
     { key: "all", label: "All" },
     { key: "pending", label: "Pending" },
+    { key: "on_hold", label: "On hold" },
     { key: "in_progress", label: "In progress" },
     { key: "resolved", label: "Resolved" },
 ] as const;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
     Building,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/types";
 import { apiRequest } from "@/lib/api";
 import { Colors, Radius } from "@/constants/theme";
-import { ChipGroup } from "./ui/Chip";
+import { Select } from "./ui/Select";
 
 interface BuildingFloorRoomPickerProps {
     selectedBuildingId: string | null;
@@ -125,29 +125,32 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
         }
     };
 
-    const spinner = <ActivityIndicator color={Colors.primary} style={styles.spinner} />;
+    const ROOM_GENERAL = "__general__";
 
     return (
         <View>
             {/* 1. Building */}
             <Step index={1} title="Building" done={!!selectedBuildingId} />
-            {loadingBuildings ? (
-                spinner
-            ) : buildings.length === 0 ? (
+            {!loadingBuildings && buildings.length === 0 ? (
                 <Text style={styles.emptyText}>No buildings configured yet.</Text>
             ) : (
-                <ChipGroup
+                <Select
+                    icon="business-outline"
+                    placeholder="Choose a building"
+                    sheetTitle="Select building"
+                    loading={loadingBuildings}
+                    success={!!selectedBuildingId}
                     options={buildings.map((b) => ({
                         key: b._id,
-                        label: `${b.name} · ${b.code}`,
+                        label: b.name,
+                        description: b.code,
                         icon: "business-outline" as IoniconName,
                     }))}
-                    value={selectedBuildingId ?? ""}
+                    value={selectedBuildingId}
                     onChange={(id) => {
                         const building = buildings.find((b) => b._id === id);
                         if (building) onSelectBuilding(building);
                     }}
-                    style={styles.chipRow}
                 />
             )}
 
@@ -155,25 +158,28 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
             {selectedBuildingId && (
                 <>
                     <Step index={2} title="Floor" done={!!selectedFloorId} />
-                    {loadingFloors ? (
-                        spinner
-                    ) : floors.length === 0 ? (
+                    {!loadingFloors && floors.length === 0 ? (
                         <Text style={styles.emptyText}>
                             No floors added yet for this building.
                         </Text>
                     ) : (
-                        <ChipGroup
+                        <Select
+                            icon="layers-outline"
+                            placeholder="Choose a floor"
+                            sheetTitle="Select floor"
+                            loading={loadingFloors}
+                            success={!!selectedFloorId}
                             options={floors.map((f) => ({
                                 key: f._id,
-                                label: `${f.name} · ${f.prefix}`,
+                                label: f.name,
+                                description: `Prefix ${f.prefix}`,
                                 icon: "layers-outline" as IoniconName,
                             }))}
-                            value={selectedFloorId ?? ""}
+                            value={selectedFloorId}
                             onChange={(id) => {
                                 const floor = floors.find((f) => f._id === id);
                                 if (floor) onSelectFloor(floor);
                             }}
-                            style={styles.chipRow}
                         />
                     )}
                 </>
@@ -183,36 +189,40 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
             {selectedFloorId && (
                 <>
                     <Step index={3} title="Room" optional done={!!selectedRoomId} />
-                    {loadingRooms ? (
-                        spinner
-                    ) : rooms.length === 0 ? (
+                    {!loadingRooms && rooms.length === 0 ? (
                         <Text style={styles.emptyText}>
                             No specific rooms listed for this floor.
                         </Text>
                     ) : (
-                        <ChipGroup
+                        <Select
+                            icon="cube-outline"
+                            placeholder="Entire floor"
+                            sheetTitle="Select room"
+                            loading={loadingRooms}
+                            success={!!selectedRoomId}
                             options={[
                                 {
-                                    key: "__general__",
+                                    key: ROOM_GENERAL,
                                     label: "Entire floor",
+                                    description: "No specific room",
                                     icon: "expand-outline" as IoniconName,
                                 },
                                 ...rooms.map((r) => ({
                                     key: r._id,
-                                    label: `${r.roomNumber} · ${r.name || r.roomType}`,
+                                    label: r.roomNumber,
+                                    description: r.name || r.roomType,
                                     icon: ROOM_ICONS[r.roomType] ?? ("cube-outline" as IoniconName),
                                 })),
                             ]}
-                            value={selectedRoomId ?? "__general__"}
+                            value={selectedRoomId ?? ROOM_GENERAL}
                             onChange={(id) => {
-                                if (id === "__general__") {
+                                if (id === ROOM_GENERAL) {
                                     onSelectRoom(null);
                                     return;
                                 }
                                 const room = rooms.find((r) => r._id === id);
                                 if (room) onSelectRoom(room);
                             }}
-                            style={styles.chipRow}
                         />
                     )}
                 </>
@@ -258,13 +268,6 @@ const styles = StyleSheet.create({
         color: Colors.textTertiary,
         textTransform: "uppercase",
         letterSpacing: 0.4,
-    },
-    chipRow: {
-        marginBottom: 2,
-    },
-    spinner: {
-        alignSelf: "flex-start",
-        marginVertical: 8,
     },
     emptyText: {
         fontSize: 12.5,

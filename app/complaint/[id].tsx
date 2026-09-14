@@ -326,12 +326,24 @@ export default function ComplaintDetailScreen() {
                             )}
 
                             <View style={styles.manageActions}>
-                                {complaint.status === "pending" && (
+                                {(complaint.status === "pending" ||
+                                    complaint.status === "on_hold") && (
                                     <Button
                                         label="Start work"
                                         icon="construct-outline"
                                         variant="secondary"
                                         onPress={() => updateStatus("in_progress")}
+                                        disabled={busy}
+                                        style={styles.manageBtn}
+                                    />
+                                )}
+
+                                {complaint.status === "pending" && (
+                                    <Button
+                                        label="Put on hold"
+                                        icon="pause-circle-outline"
+                                        variant="ghost"
+                                        onPress={() => updateStatus("on_hold")}
                                         disabled={busy}
                                         style={styles.manageBtn}
                                     />

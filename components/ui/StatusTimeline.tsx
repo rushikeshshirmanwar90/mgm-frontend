@@ -2,9 +2,9 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Colors, Radius } from "@/constants/theme";
+import type { ComplaintStatus as Status } from "@/lib/types";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-type Status = "pending" | "in_progress" | "resolved" | "rejected";
 
 interface Step {
     key: string;
@@ -166,19 +166,24 @@ function buildSteps(
 
     const started = status === "in_progress" || status === "resolved";
     const done = status === "resolved";
+    const held = status === "on_hold";
 
     return [
         reported,
         {
             key: "in_progress",
-            label: "Work in progress",
+            label: held ? "On hold" : "Work in progress",
             detail: started
                 ? "The maintenance team has picked this up and started the repair."
-                : "Waiting for the Estate Manager to review and assign the repair.",
-            icon: started ? "construct" : "time-outline",
-            state: done ? "done" : started ? "current" : "upcoming",
-            date: started && !done ? formatDate(updatedAt) : undefined,
-            color: started ? Colors.primary : Colors.warning,
+                : held
+                  ? "The Estate Manager has reviewed this and parked it for now. It will be picked up when resources free up."
+                  : "Waiting for the Estate Manager to review and assign the repair.",
+            icon: started ? "construct" : held ? "pause" : "time-outline",
+            // A hold is a decision the reporter should see as the current
+            // state, not as "still waiting", so it gets the Now pill too.
+            state: done ? "done" : started || held ? "current" : "upcoming",
+            date: (started || held) && !done ? formatDate(updatedAt) : undefined,
+            color: started ? Colors.primary : held ? Colors.textSecondary : Colors.warning,
         },
         {
             key: "resolved",

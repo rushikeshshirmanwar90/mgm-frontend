@@ -52,6 +52,16 @@ export interface CostDetail {
     updatedAt?: string;
 }
 
+export type ComplaintStatus = "pending" | "on_hold" | "in_progress" | "resolved" | "rejected";
+
+/** The slice of a complaint that rides along on a notification (see /notifications). */
+export interface NotificationComplaint {
+    _id: string;
+    title: string;
+    status: ComplaintStatus;
+    priority: Complaint["priority"];
+}
+
 export interface Complaint {
     _id: string;
     title: string;
@@ -62,7 +72,7 @@ export interface Complaint {
     roomId?: Room | string;
     locationType: "classroom" | "washroom" | "lab" | "office" | "library" | "corridor" | "other";
     photos: string[];
-    status: "pending" | "in_progress" | "resolved" | "rejected";
+    status: ComplaintStatus;
     priority: "low" | "medium" | "high" | "critical";
     assignedTo?: User | string;
     costDetails?: CostDetail;
@@ -78,7 +88,8 @@ export interface AppNotification {
     title: string;
     message: string;
     type: "complaint_update" | "complaint_resolved" | "new_complaint" | "registration_approved" | "registration_rejected";
-    complaintId?: string;
+    /** Populated by the API; falls back to a bare id if the complaint was deleted. */
+    complaintId?: NotificationComplaint | string | null;
     isRead: boolean;
     createdAt: string;
 }

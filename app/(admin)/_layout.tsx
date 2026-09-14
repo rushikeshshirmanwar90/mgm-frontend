@@ -1,15 +1,23 @@
 import { Tabs } from "expo-router";
-import { tabIcon, useTabScreenOptions } from "@/components/ui";
+import { renderTabBar, tabIcon, useTabScreenOptions } from "@/components/ui";
 
 export default function AdminLayout() {
     return (
-        <Tabs screenOptions={useTabScreenOptions()}>
+        <Tabs tabBar={renderTabBar} screenOptions={useTabScreenOptions()}>
             <Tabs.Screen
                 name="index"
                 options={{
                     title: "Overview",
                     tabBarLabel: "Overview",
                     tabBarIcon: tabIcon("grid"),
+                }}
+            />
+            <Tabs.Screen
+                name="notifications"
+                options={{
+                    title: "Inbox",
+                    tabBarLabel: "Inbox",
+                    tabBarIcon: tabIcon("notifications"),
                 }}
             />
             <Tabs.Screen
