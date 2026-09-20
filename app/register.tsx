@@ -848,8 +848,8 @@ const styles = StyleSheet.create({
         borderColor: Colors.primaryBorder,
     },
     stepDotDone: {
-        backgroundColor: Colors.success,
-        borderColor: Colors.success,
+        backgroundColor: Colors.successDark,
+        borderColor: Colors.successDark,
     },
     stepNum: {
         fontSize: 11,
@@ -947,7 +947,7 @@ const styles = StyleSheet.create({
     },
     otpCellActive: {
         borderColor: Colors.primaryDark,
-        backgroundColor: "#F0F9FF",
+        backgroundColor: Colors.primaryLight,
     },
     otpCellError: {
         borderColor: Colors.error,

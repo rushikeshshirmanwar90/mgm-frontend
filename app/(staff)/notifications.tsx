@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import { AppNotification, NotificationsResponse } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { EmptyState, IconChip } from "@/components/ui";
+import { EmptyState, IconChip, TAB_BAR_CLEARANCE, useHideTabBarOnScroll } from "@/components/ui";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -25,6 +25,7 @@ const NOTIF_STYLES: Record<string, { icon: IoniconName; color: string }> = {
 };
 
 export default function NotificationsScreen() {
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -89,6 +90,8 @@ export default function NotificationsScreen() {
                 keyExtractor={(item) => item._id}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={scrollEventThrottle}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -185,7 +188,7 @@ const styles = StyleSheet.create({
     listContent: {
         paddingHorizontal: 16,
         paddingTop: 6,
-        paddingBottom: 28,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
     card: {
         flexDirection: "row",

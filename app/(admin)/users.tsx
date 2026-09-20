@@ -18,7 +18,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/api";
 import { User, UserResponse, UsersResponse, UserRole } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Banner, Button, ChipGroup, EmptyState, TextField } from "@/components/ui";
+import {
+    Banner,
+    Button,
+    ChipGroup,
+    EmptyState,
+    TAB_BAR_CLEARANCE,
+    TextField,
+    useHideTabBarOnScroll,
+} from "@/components/ui";
 
 type FilterKey = "all" | "staff" | "manager" | "admin" | "pending" | "rejected";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -41,6 +49,7 @@ const ROLE_STYLES: Record<UserRole, { bg: string; fg: string; icon: IoniconName 
 export default function AdminUsersScreen() {
     // Keeps the sheet's action buttons clear of the system navigation area.
     const insets = useSafeAreaInsets();
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
     const [users, setUsers] = useState<User[]>([]);
     const [filter, setFilter] = useState<FilterKey>("all");
     const [refreshing, setRefreshing] = useState(false);
@@ -175,6 +184,8 @@ export default function AdminUsersScreen() {
                 keyExtractor={(item) => item._id || item.id}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={scrollEventThrottle}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -472,7 +483,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingHorizontal: 16,
-        paddingBottom: 28,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
     card: {
         backgroundColor: Colors.surface,

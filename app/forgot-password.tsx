@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     },
     otpInputFocused: {
         borderColor: Colors.primary,
-        backgroundColor: "#F0F9FF",
+        backgroundColor: Colors.primaryLight,
     },
     otpHint: {
         fontSize: 11.5,

@@ -5,11 +5,11 @@ import { Platform } from 'react-native';
 // All screens must reference these tokens — never hardcode accent colors.
 
 export const Colors = {
-  // Primary brand blue
-  primary:        '#3A78B5',
-  primaryDark:    '#295E94',
-  primaryLight:   '#DCEEFF',
-  primaryBorder:  '#B8D8F8',
+  // Primary brand purple — taken from mgmcen.ac.in's own palette
+  primary:        '#8B71CC',
+  primaryDark:    '#58368C',
+  primaryLight:   '#EDE8F8',
+  primaryBorder:  '#CDC5E5',
 
   // Backgrounds
   background:     '#F8FAFC',
@@ -20,7 +20,7 @@ export const Colors = {
   textPrimary:    '#0F172A',
   textBody:       '#1E293B',
   textSecondary:  '#64748B',
-  textTertiary:   '#94A3B8',
+  textTertiary:   '#5F6F86',
 
   // Border
   border:         '#E2E8F0',
@@ -40,8 +40,8 @@ export const Colors = {
   errorDark:      '#B91C1C',
   errorLight:     '#FEF2F2',
   errorBorder:    '#FEE2E2',
-  info:           '#3A78B5',
-  infoLight:      '#DCEEFF',
+  info:           '#8B71CC',
+  infoLight:      '#EDE8F8',
 
   // Accent used for money / cost figures
   money:          '#10B981',
@@ -50,10 +50,10 @@ export const Colors = {
   light: {
     text:             '#1E293B',
     background:       '#F8FAFC',
-    tint:             '#3A78B5',
+    tint:             '#8B71CC',
     icon:             '#64748B',
     tabIconDefault:   '#94A3B8',
-    tabIconSelected:  '#3A78B5',
+    tabIconSelected:  '#8B71CC',
   },
   dark: {
     text:             '#ECEDEE',

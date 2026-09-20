@@ -23,6 +23,9 @@ export default function ManagerDashboard() {
         pendingApprovals: 0,
     });
     const [recentComplaints, setRecentComplaints] = useState<Complaint[]>([]);
+    // The full list's ids, not just the 3 shown — so swiping through a
+    // complaint opened from here can move past those 3.
+    const [allComplaintIds, setAllComplaintIds] = useState<string[]>([]);
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
@@ -35,6 +38,7 @@ export default function ManagerDashboard() {
             const data = await apiRequest<ComplaintsResponse>("/complaints");
             const complaints: Complaint[] = data.complaints || [];
             setRecentComplaints(complaints.slice(0, 3));
+            setAllComplaintIds(complaints.map((c) => c._id));
 
             const pending = complaints.filter((c) => c.status === "pending").length;
             const in_progress = complaints.filter((c) => c.status === "in_progress").length;
@@ -113,7 +117,11 @@ export default function ManagerDashboard() {
                         key={item._id}
                         complaint={item}
                         showCost
-                        onPress={() => router.push(`/complaint/${item._id}`)}
+                        onPress={() =>
+                            router.push(
+                                `/complaint/${item._id}?ids=${allComplaintIds.join(",")}`
+                            )
+                        }
                     />
                 ))
             )}

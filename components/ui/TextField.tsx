@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     },
     containerFocused: {
         borderColor: Colors.primary,
-        backgroundColor: "#F0F9FF",
+        backgroundColor: Colors.primaryLight,
     },
     containerSuccess: {
         borderColor: Colors.successBorder,

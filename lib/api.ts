@@ -5,20 +5,8 @@ import { Platform } from "react-native";
 export const TOKEN_KEY = "mgm_token";
 export const USER_KEY = "mgm_user";
 
-/**
- * Works out where the backend lives.
- *
- * Order of preference:
- *  1. EXPO_PUBLIC_API_URL — set this in `mgm-frontend/.env` for real devices and
- *     deployed builds.
- *  2. The host serving the Expo dev bundle, so a phone on the same Wi-Fi reaches
- *     your laptop instead of its own loopback. Hardcoding "localhost" meant the
- *     app only ever worked in a simulator or the web preview.
- *  3. Platform-appropriate loopback (10.0.2.2 is the host from an Android
- *     emulator).
- */
 function resolveBaseUrl(): string {
-    const fromEnv = "http://10.188.124.135:3000";
+    const fromEnv = process.env.EXPO_PUBLIC_API_URL;
     if (fromEnv) {
         return `${fromEnv.replace(/\/+$/, "")}/api`;
     }

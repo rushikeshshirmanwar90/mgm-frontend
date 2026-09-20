@@ -6,7 +6,14 @@ import { Complaint, ComplaintResponse, ComplaintsResponse } from "@/lib/types";
 import { searchComplaints } from "@/lib/complaint-search";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { Colors } from "@/constants/theme";
-import { Button, ChipGroup, EmptyState, SearchBar } from "@/components/ui";
+import {
+    Button,
+    ChipGroup,
+    EmptyState,
+    SearchBar,
+    TAB_BAR_CLEARANCE,
+    useHideTabBarOnScroll,
+} from "@/components/ui";
 
 const STATUS_FILTERS = [
     { key: "all", label: "All" },
@@ -17,6 +24,7 @@ const STATUS_FILTERS = [
 
 export default function ManagerComplaintsScreen() {
     const router = useRouter();
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
 
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -91,6 +99,8 @@ export default function ManagerComplaintsScreen() {
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                onScroll={onScroll}
+                scrollEventThrottle={scrollEventThrottle}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -110,11 +120,15 @@ export default function ManagerComplaintsScreen() {
                               ? { label: "Mark resolved", status: "resolved", icon: "checkmark-circle-outline" as const }
                               : null;
 
+                    const complaintIds = visible.map((c) => c._id).join(",");
+
                     return (
                         <ComplaintCard
                             complaint={item}
                             showCost
-                            onPress={() => router.push(`/complaint/${item._id}`)}
+                            onPress={() =>
+                                router.push(`/complaint/${item._id}?ids=${complaintIds}`)
+                            }
                             footer={
                                 nextStep ? (
                                     <View style={styles.actionBar}>
@@ -137,7 +151,11 @@ export default function ManagerComplaintsScreen() {
                                             iconAfter
                                             variant="ghost"
                                             size="sm"
-                                            onPress={() => router.push(`/complaint/${item._id}`)}
+                                            onPress={() =>
+                                                router.push(
+                                                    `/complaint/${item._id}?ids=${complaintIds}`
+                                                )
+                                            }
                                         />
                                     </View>
                                 ) : null
@@ -189,7 +207,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingHorizontal: 16,
-        paddingBottom: 28,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
     actionBar: {
         flexDirection: "row",

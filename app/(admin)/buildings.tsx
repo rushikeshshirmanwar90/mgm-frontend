@@ -26,7 +26,14 @@ import {
     RoomsResponse,
 } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Banner, Button, SectionTitle, TextField } from "@/components/ui";
+import {
+    Banner,
+    Button,
+    SectionTitle,
+    TAB_BAR_CLEARANCE,
+    TextField,
+    useHideTabBarOnScroll,
+} from "@/components/ui";
 
 type RoomType = "classroom" | "washroom" | "lab" | "office";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -71,6 +78,7 @@ const ROOM_ICONS: Record<string, IoniconName> = {
 };
 
 export default function ManageBuildingsScreen() {
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
     const [buildings, setBuildings] = useState<Building[]>([]);
     const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
     const [floors, setFloors] = useState<Floor[]>([]);
@@ -416,6 +424,8 @@ export default function ManageBuildingsScreen() {
             style={styles.page}
             contentContainerStyle={styles.container}
             showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={scrollEventThrottle}
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
@@ -759,14 +769,14 @@ const EntityTile: React.FC<{
         </TouchableOpacity>
 
         <View style={styles.tileActions}>
-            <TouchableOpacity onPress={onEdit} hitSlop={8}>
+            <TouchableOpacity onPress={onEdit} hitSlop={10}>
                 <Ionicons
                     name="create-outline"
                     size={15}
                     color={selected ? "#C5DDF4" : Colors.textTertiary}
                 />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onDelete} hitSlop={8}>
+            <TouchableOpacity onPress={onDelete} hitSlop={10}>
                 <Ionicons
                     name="trash-outline"
                     size={15}
@@ -848,7 +858,7 @@ const styles = StyleSheet.create({
     },
     container: {
         padding: 16,
-        paddingBottom: 36,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
     intro: {
         fontSize: 12.5,
@@ -927,7 +937,7 @@ const styles = StyleSheet.create({
     tileActions: {
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 14,
+        gap: 24,
         marginTop: 10,
     },
     roomsGrid: {

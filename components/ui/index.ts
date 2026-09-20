@@ -9,7 +9,15 @@ export { ProgressBar } from "./ProgressBar";
 export { Screen } from "./Screen";
 export { SearchBar } from "./SearchBar";
 export { SectionTitle } from "./SectionTitle";
+export { Select } from "./Select";
+export type { SelectOption } from "./Select";
 export { StatusTimeline } from "./StatusTimeline";
 export { StatCard } from "./StatCard";
-export { tabIcon, useTabScreenOptions } from "./TabBar";
+export {
+    createTabBar,
+    TAB_BAR_CLEARANCE,
+    useHideTabBarOnScroll,
+    useTabScreenOptions,
+} from "./TabBar";
+export type { TabMeta } from "./TabBar";
 export { TextField } from "./TextField";

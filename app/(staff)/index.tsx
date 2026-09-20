@@ -7,13 +7,14 @@ import { useAuth } from "@/context/AuthContext";
 import { Complaint, ComplaintsResponse, NotificationsResponse } from "@/lib/types";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { ApprovalStatusNotice } from "@/components/ApprovalStatusNotice";
-import { Colors } from "@/constants/theme";
+import { Colors, Radius, Shadow } from "@/constants/theme";
 import {
     Banner,
     EmptyState,
     Screen,
     SectionTitle,
     StatCard,
+    TAB_BAR_CLEARANCE,
 } from "@/components/ui";
 
 export default function StaffDashboard() {
@@ -21,6 +22,9 @@ export default function StaffDashboard() {
     const { user, refreshUser } = useAuth();
 
     const [recentComplaints, setRecentComplaints] = useState<Complaint[]>([]);
+    // The full list's ids, not just the 3 shown — so swiping through a
+    // complaint opened from here can move past those 3.
+    const [allComplaintIds, setAllComplaintIds] = useState<string[]>([]);
     const [stats, setStats] = useState({ pending: 0, in_progress: 0, resolved: 0 });
     const [unreadNotifs, setUnreadNotifs] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +41,7 @@ export default function StaffDashboard() {
             const data = await apiRequest<ComplaintsResponse>("/complaints");
             const complaints: Complaint[] = data.complaints || [];
             setRecentComplaints(complaints.slice(0, 3));
+            setAllComplaintIds(complaints.map((c) => c._id));
 
             const pending = complaints.filter((c) => c.status === "pending").length;
             const in_progress = complaints.filter((c) => c.status === "in_progress").length;
@@ -67,7 +72,8 @@ export default function StaffDashboard() {
     }
 
     return (
-        <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
+        <View style={styles.flex}>
+            <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
             {unreadNotifs > 0 && (
                 <Banner
                     tone="info"
@@ -127,22 +133,58 @@ export default function StaffDashboard() {
                 <EmptyState
                     icon="cube-outline"
                     title="No complaints yet"
-                    message="Use the Report tab below to submit your first issue."
+                    message="Tap the + button below to submit your first issue."
                 />
             ) : (
                 recentComplaints.map((item) => (
                     <ComplaintCard
                         key={item._id}
                         complaint={item}
-                        onPress={() => router.push(`/complaint/${item._id}`)}
+                        onPress={() =>
+                            router.push(
+                                `/complaint/${item._id}?ids=${allComplaintIds.join(",")}`
+                            )
+                        }
                     />
                 ))
             )}
         </Screen>
+
+            {/* Report an issue. Lives here instead of on the tab bar so the
+                bar itself stays a plain 3-item navigator; this is the one
+                primary action on the screen that deserves to stand out. */}
+            <TouchableOpacity
+                style={styles.fab}
+                onPress={() => router.push("/(staff)/raise")}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Report an issue"
+            >
+                <Ionicons name="add" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    flex: {
+        flex: 1,
+    },
+    fab: {
+        position: "absolute",
+        right: 20,
+        // Cleared above the floating tab bar's own footprint rather than a
+        // flat guess, so it stays clear of it however tall the bar ends up
+        // on a given device's safe-area inset.
+        bottom: TAB_BAR_CLEARANCE - 30,
+        width: 56,
+        height: 56,
+        borderRadius: Radius.full,
+        backgroundColor: Colors.primary,
+        alignItems: "center",
+        justifyContent: "center",
+        ...Shadow.lg,
+    },
     statsRow: {
         flexDirection: "row",
         gap: 8,

@@ -1,6 +1,7 @@
 import React from "react";
 import { RefreshControl, ScrollView, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { Colors } from "@/constants/theme";
+import { TAB_BAR_CLEARANCE, useHideTabBarOnScroll } from "./TabBar";
 
 interface ScreenProps {
     children: React.ReactNode;
@@ -13,14 +14,16 @@ interface ScreenProps {
 }
 
 /** Page shell: app background, consistent gutters and pull-to-refresh wiring. */
-export const Screen: React.FC<ScreenProps> = ({
-    children,
-    scroll = false,
-    refreshing,
-    onRefresh,
-    style,
-    contentStyle,
-}) => {
+export const Screen = React.forwardRef<ScrollView, ScreenProps>(function Screen(
+    { children, scroll = false, refreshing, onRefresh, style, contentStyle },
+    ref
+) {
+    // Also resets the floating tab bar to visible whenever this screen gains
+    // focus, so it never stays hidden from a scroll position left over on a
+    // different tab — harmless to call even on the one screen (complaint
+    // detail) that isn't inside a tab navigator at all.
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
+
     const refreshControl = onRefresh ? (
         <RefreshControl
             refreshing={!!refreshing}
@@ -33,10 +36,13 @@ export const Screen: React.FC<ScreenProps> = ({
     if (scroll) {
         return (
             <ScrollView
+                ref={ref}
                 style={[styles.page, style]}
                 contentContainerStyle={[styles.content, contentStyle]}
                 refreshControl={refreshControl}
                 showsVerticalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={scrollEventThrottle}
             >
                 {children}
             </ScrollView>
@@ -44,7 +50,7 @@ export const Screen: React.FC<ScreenProps> = ({
     }
 
     return <View style={[styles.page, styles.content, style]}>{children}</View>;
-};
+});
 
 const styles = StyleSheet.create({
     page: {
@@ -53,6 +59,6 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: 16,
-        paddingBottom: 32,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
 });

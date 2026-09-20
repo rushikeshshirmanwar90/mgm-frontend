@@ -11,7 +11,8 @@ import {
 } from "@/lib/types";
 import { apiRequest } from "@/lib/api";
 import { Colors, Radius } from "@/constants/theme";
-import { ChipGroup } from "./ui/Chip";
+import { Select } from "./ui/Select";
+import { RoomGrid } from "./RoomGrid";
 
 interface BuildingFloorRoomPickerProps {
     selectedBuildingId: string | null;
@@ -23,14 +24,6 @@ interface BuildingFloorRoomPickerProps {
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-
-const ROOM_ICONS: Record<string, IoniconName> = {
-    washroom: "water-outline",
-    lab: "flask-outline",
-    office: "briefcase-outline",
-    library: "library-outline",
-    classroom: "school-outline",
-};
 
 /** Numbered step header: index bubble, title, and a done tick once chosen. */
 const Step: React.FC<{
@@ -136,18 +129,20 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
             ) : buildings.length === 0 ? (
                 <Text style={styles.emptyText}>No buildings configured yet.</Text>
             ) : (
-                <ChipGroup
+                <Select
+                    placeholder="Select a building"
+                    icon="business-outline"
                     options={buildings.map((b) => ({
                         key: b._id,
                         label: `${b.name} · ${b.code}`,
                         icon: "business-outline" as IoniconName,
                     }))}
-                    value={selectedBuildingId ?? ""}
+                    value={selectedBuildingId}
                     onChange={(id) => {
                         const building = buildings.find((b) => b._id === id);
                         if (building) onSelectBuilding(building);
                     }}
-                    style={styles.chipRow}
+                    containerStyle={styles.selectField}
                 />
             )}
 
@@ -162,18 +157,20 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
                             No floors added yet for this building.
                         </Text>
                     ) : (
-                        <ChipGroup
+                        <Select
+                            placeholder="Select a floor"
+                            icon="layers-outline"
                             options={floors.map((f) => ({
                                 key: f._id,
                                 label: `${f.name} · ${f.prefix}`,
                                 icon: "layers-outline" as IoniconName,
                             }))}
-                            value={selectedFloorId ?? ""}
+                            value={selectedFloorId}
                             onChange={(id) => {
                                 const floor = floors.find((f) => f._id === id);
                                 if (floor) onSelectFloor(floor);
                             }}
-                            style={styles.chipRow}
+                            containerStyle={styles.selectField}
                         />
                     )}
                 </>
@@ -182,7 +179,7 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
             {/* 3. Room */}
             {selectedFloorId && (
                 <>
-                    <Step index={3} title="Room" optional done={!!selectedRoomId} />
+                    <Step index={3} title="Class / room" optional done={!!selectedRoomId} />
                     {loadingRooms ? (
                         spinner
                     ) : rooms.length === 0 ? (
@@ -190,29 +187,10 @@ export const BuildingFloorRoomPicker: React.FC<BuildingFloorRoomPickerProps> = (
                             No specific rooms listed for this floor.
                         </Text>
                     ) : (
-                        <ChipGroup
-                            options={[
-                                {
-                                    key: "__general__",
-                                    label: "Entire floor",
-                                    icon: "expand-outline" as IoniconName,
-                                },
-                                ...rooms.map((r) => ({
-                                    key: r._id,
-                                    label: `${r.roomNumber} · ${r.name || r.roomType}`,
-                                    icon: ROOM_ICONS[r.roomType] ?? ("cube-outline" as IoniconName),
-                                })),
-                            ]}
-                            value={selectedRoomId ?? "__general__"}
-                            onChange={(id) => {
-                                if (id === "__general__") {
-                                    onSelectRoom(null);
-                                    return;
-                                }
-                                const room = rooms.find((r) => r._id === id);
-                                if (room) onSelectRoom(room);
-                            }}
-                            style={styles.chipRow}
+                        <RoomGrid
+                            rooms={rooms}
+                            selectedRoomId={selectedRoomId}
+                            onSelectRoom={onSelectRoom}
                         />
                     )}
                 </>
@@ -259,7 +237,7 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
         letterSpacing: 0.4,
     },
-    chipRow: {
+    selectField: {
         marginBottom: 2,
     },
     spinner: {

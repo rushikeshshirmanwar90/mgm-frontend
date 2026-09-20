@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
     View,
     Text,
@@ -13,17 +13,20 @@ import {
     Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { BuildingFloorRoomPicker } from "@/components/BuildingFloorRoomPicker";
+import { RoomCodeSearch, RoomMatch } from "@/components/RoomCodeSearch";
 import { ApprovalStatusNotice } from "@/components/ApprovalStatusNotice";
 import { Building, Floor, Room } from "@/lib/types";
 import { apiRequest, uploadImageToCloudinary } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { Colors, PriorityColors, Radius } from "@/constants/theme";
-import { Button, Card, Chip, Screen, SectionTitle, TextField } from "@/components/ui";
+import { Button, Card, Screen, SectionTitle, Select, TextField } from "@/components/ui";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+type Step = "location" | "details";
 
 const LOCATION_TYPES: { key: string; label: string; icon: IoniconName }[] = [
     { key: "classroom", label: "Classroom", icon: "school-outline" },
@@ -35,9 +38,23 @@ const LOCATION_TYPES: { key: string; label: string; icon: IoniconName }[] = [
 
 const PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
+/** Two-segment progress bar standing in for the "Where is the issue? / Issue details" card. */
+function StepProgress({ step }: { step: Step }) {
+    return (
+        <View style={styles.stepProgress}>
+            <View style={[styles.stepSegment, styles.stepSegmentActive]} />
+            <View style={[styles.stepSegment, step === "details" && styles.stepSegmentActive]} />
+        </View>
+    );
+}
+
 export default function RaiseComplaintScreen() {
     const router = useRouter();
+    const navigation = useNavigation();
     const { user } = useAuth();
+
+    const [step, setStep] = useState<Step>("location");
+    const [searchOpen, setSearchOpen] = useState(false);
 
     const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
     const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
@@ -55,6 +72,67 @@ export default function RaiseComplaintScreen() {
 
     const scrollRef = useRef<ScrollView>(null);
     const descriptionRef = useRef<TextInput>(null);
+    const searchInputRef = useRef<TextInput>(null);
+
+    // Header lives on this screen rather than in the Tabs layout: both
+    // buttons need to reach into this screen's own state (which step we're
+    // on, whether search is open) and refs.
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerLeft: () => (
+                <TouchableOpacity
+                    onPress={() => (step === "details" ? setStep("location") : router.back())}
+                    hitSlop={10}
+                    style={styles.headerBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={step === "details" ? "Back to location" : "Go back"}
+                >
+                    <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+                </TouchableOpacity>
+            ),
+            headerRight:
+                step === "location"
+                    ? () => (
+                          <TouchableOpacity
+                              onPress={() => setSearchOpen((v) => !v)}
+                              hitSlop={10}
+                              style={styles.headerBtn}
+                              accessibilityRole="button"
+                              accessibilityLabel="Search for a class by name"
+                          >
+                              <Ionicons
+                                  name={searchOpen ? "close" : "search"}
+                                  size={22}
+                                  color={Colors.textSecondary}
+                              />
+                          </TouchableOpacity>
+                      )
+                    : undefined,
+        });
+    }, [navigation, router, step, searchOpen]);
+
+    // Jump back to the top of whichever step's content just came into view,
+    // rather than carrying over a scroll position from the other step.
+    useEffect(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [step]);
+
+    useEffect(() => {
+        if (searchOpen) {
+            const t = setTimeout(() => searchInputRef.current?.focus(), 150);
+            return () => clearTimeout(t);
+        }
+    }, [searchOpen]);
+
+    const handleRoomMatch = (match: RoomMatch) => {
+        setSelectedBuilding(match.building);
+        setSelectedFloor(match.floor);
+        setSelectedRoom(match.room);
+        setLocationType(match.room.roomType as typeof locationType);
+        setSearchOpen(false);
+        Keyboard.dismiss();
+    };
+
     /**
      * Offset of the details card inside the scroll content. The card is a direct
      * child of the content container, so `layout.y` is already the value
@@ -256,6 +334,8 @@ export default function RaiseComplaintScreen() {
         );
     }
 
+    const canProceed = !!selectedBuilding && !!selectedFloor;
+
     return (
         <KeyboardAvoidingView
             // iOS gets its keyboard inset natively from the ScrollView below,
@@ -278,195 +358,219 @@ export default function RaiseComplaintScreen() {
                 automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Location */}
-                <Card accent style={styles.card}>
-                    <SectionTitle title="Where is the issue?" />
-                    <BuildingFloorRoomPicker
-                        selectedBuildingId={selectedBuilding?._id || null}
-                        selectedFloorId={selectedFloor?._id || null}
-                        selectedRoomId={selectedRoom?._id || null}
-                        onSelectBuilding={(b) => {
-                            setSelectedBuilding(b);
-                            setSelectedFloor(null);
-                            setSelectedRoom(null);
-                        }}
-                        onSelectFloor={(f) => {
-                            setSelectedFloor(f);
-                            setSelectedRoom(null);
-                        }}
-                        onSelectRoom={(r) => {
-                            setSelectedRoom(r);
-                            if (r) setLocationType(r.roomType as any);
-                        }}
-                    />
+                <StepProgress step={step} />
 
-                    {!selectedRoom && selectedFloor && (
-                        <View style={styles.categoryBox}>
-                            <Text style={styles.categoryLabel}>Location category</Text>
-                            <View style={styles.chipWrap}>
-                                {LOCATION_TYPES.map((t) => (
-                                    <Chip
-                                        key={t.key}
-                                        label={t.label}
-                                        icon={t.icon}
-                                        selected={locationType === t.key}
-                                        onPress={() => setLocationType(t.key as any)}
-                                    />
-                                ))}
-                            </View>
-                        </View>
-                    )}
-                </Card>
+                {step === "location" ? (
+                    <View>
+                        <SectionTitle title="Where is the issue?" />
 
-                {/* Details */}
-                <View
-                    onLayout={(e) => {
-                        detailsCardY.current = e.nativeEvent.layout.y;
-                    }}
-                >
-                    <Card style={styles.card}>
-                        <SectionTitle title="Issue details" />
+                        {searchOpen && (
+                            <RoomCodeSearch ref={searchInputRef} onMatch={handleRoomMatch} />
+                        )}
 
-                        <TextField
-                            label="Complaint title"
-                            icon="alert-circle-outline"
-                            value={title}
-                            onChangeText={setTitle}
-                            placeholder="e.g. Broken AC switch board"
-                            onFocus={handleDetailsFocus}
-                            returnKeyType="next"
-                            // Hand off to the description without the keyboard
-                            // closing and reopening in between.
-                            submitBehavior="submit"
-                            onSubmitEditing={() => descriptionRef.current?.focus()}
+                        <BuildingFloorRoomPicker
+                            selectedBuildingId={selectedBuilding?._id || null}
+                            selectedFloorId={selectedFloor?._id || null}
+                            selectedRoomId={selectedRoom?._id || null}
+                            onSelectBuilding={(b) => {
+                                setSelectedBuilding(b);
+                                setSelectedFloor(null);
+                                setSelectedRoom(null);
+                            }}
+                            onSelectFloor={(f) => {
+                                setSelectedFloor(f);
+                                setSelectedRoom(null);
+                            }}
+                            onSelectRoom={(r) => {
+                                setSelectedRoom(r);
+                                if (r) setLocationType(r.roomType as any);
+                            }}
                         />
 
-                        <TextField
-                            ref={descriptionRef}
-                            label="Description"
-                            icon="document-text-outline"
-                            multiline
-                            value={description}
-                            onChangeText={setDescription}
-                            placeholder="Describe what is damaged and any exact location details."
-                            onFocus={handleDetailsFocus}
-                            // Return inserts a line break here rather than
-                            // ending input — descriptions run to a few lines.
-                            submitBehavior="newline"
+                        {!selectedRoom && selectedFloor && (
+                            <View style={styles.categoryBox}>
+                                <Select
+                                    label="Location category"
+                                    placeholder="Select a category"
+                                    options={LOCATION_TYPES.map((t) => ({
+                                        key: t.key,
+                                        label: t.label,
+                                        icon: t.icon,
+                                    }))}
+                                    value={locationType}
+                                    onChange={(key) => setLocationType(key as typeof locationType)}
+                                />
+                            </View>
+                        )}
+
+                        <Button
+                            label="Next: Issue details"
+                            icon="arrow-forward"
+                            iconAfter
+                            size="lg"
+                            fullWidth
+                            disabled={!canProceed}
+                            onPress={() => setStep("details")}
+                            style={styles.nextBtn}
                         />
-
-                        <Text style={styles.categoryLabel}>Priority</Text>
-                        <View style={styles.priorityRow}>
-                            {PRIORITIES.map((p) => {
-                                const active = priority === p;
-                                const tone = PriorityColors[p];
-                                return (
-                                    <TouchableOpacity
-                                        key={p}
-                                        onPress={() => setPriority(p)}
-                                        activeOpacity={0.8}
-                                        style={[
-                                            styles.priorityChip,
-                                            active && {
-                                                backgroundColor: tone.bg,
-                                                borderColor: tone.fg,
-                                            },
-                                        ]}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.priorityDot,
-                                                {
-                                                    backgroundColor: active
-                                                        ? tone.fg
-                                                        : Colors.border,
-                                                },
-                                            ]}
-                                        />
-                                        <Text
-                                            style={[
-                                                styles.priorityText,
-                                                active && { color: tone.fg },
-                                            ]}
-                                        >
-                                            {p}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </Card>
-                </View>
-
-                {/* Photos */}
-                <Card style={styles.card}>
-                    <SectionTitle
-                        title="Damage photos"
-                        action={
-                            localPhotos.length > 0 ? (
-                                <Text style={styles.photoCount}>
-                                    {localPhotos.length} attached
-                                </Text>
-                            ) : null
-                        }
-                    />
-
-                    <View style={styles.pickerRow}>
-                        <TouchableOpacity
-                            style={styles.pickerOption}
-                            onPress={handleTakePhoto}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.pickerIcon}>
-                                <Ionicons name="camera" size={20} color={Colors.primary} />
-                            </View>
-                            <Text style={styles.pickerLabel}>Take photo</Text>
-                            <Text style={styles.pickerHint}>Use the camera</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.pickerOption}
-                            onPress={handlePickFromGallery}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.pickerIcon}>
-                                <Ionicons name="images" size={20} color={Colors.primary} />
-                            </View>
-                            <Text style={styles.pickerLabel}>From gallery</Text>
-                            <Text style={styles.pickerHint}>Pick existing</Text>
-                        </TouchableOpacity>
                     </View>
-
-                    {localPhotos.length > 0 && (
-                        <ScrollView
-                            horizontal
-                            style={styles.photoPreviewRow}
-                            showsHorizontalScrollIndicator={false}
+                ) : (
+                    <>
+                        {/* Details */}
+                        <View
+                            onLayout={(e) => {
+                                detailsCardY.current = e.nativeEvent.layout.y;
+                            }}
                         >
-                            {localPhotos.map((uri, idx) => (
-                                <View key={idx} style={styles.photoWrapper}>
-                                    <Image source={{ uri }} style={styles.photoPreview} />
-                                    <TouchableOpacity
-                                        style={styles.removePhotoBtn}
-                                        onPress={() => handleRemovePhoto(idx)}
-                                        hitSlop={6}
-                                    >
-                                        <Ionicons name="close" size={12} color="#FFFFFF" />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    )}
-                </Card>
+                            <Card style={styles.card}>
+                                <SectionTitle title="Issue details" />
 
-                <Button
-                    label="Submit complaint"
-                    icon="paper-plane-outline"
-                    size="lg"
-                    fullWidth
-                    loading={submitting}
-                    onPress={handleSubmit}
-                />
+                                <TextField
+                                    label="Complaint title"
+                                    icon="alert-circle-outline"
+                                    value={title}
+                                    onChangeText={setTitle}
+                                    placeholder="e.g. Broken AC switch board"
+                                    onFocus={handleDetailsFocus}
+                                    returnKeyType="next"
+                                    // Hand off to the description without the keyboard
+                                    // closing and reopening in between.
+                                    submitBehavior="submit"
+                                    onSubmitEditing={() => descriptionRef.current?.focus()}
+                                />
+
+                                <TextField
+                                    ref={descriptionRef}
+                                    label="Description"
+                                    icon="document-text-outline"
+                                    multiline
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    placeholder="Describe what is damaged and any exact location details."
+                                    onFocus={handleDetailsFocus}
+                                    // Return inserts a line break here rather than
+                                    // ending input — descriptions run to a few lines.
+                                    submitBehavior="newline"
+                                />
+
+                                <Text style={styles.categoryLabel}>Priority</Text>
+                                <View style={styles.priorityRow}>
+                                    {PRIORITIES.map((p) => {
+                                        const active = priority === p;
+                                        const tone = PriorityColors[p];
+                                        return (
+                                            <TouchableOpacity
+                                                key={p}
+                                                onPress={() => setPriority(p)}
+                                                activeOpacity={0.8}
+                                                style={[
+                                                    styles.priorityChip,
+                                                    active && {
+                                                        backgroundColor: tone.bg,
+                                                        borderColor: tone.fg,
+                                                    },
+                                                ]}
+                                            >
+                                                <View
+                                                    style={[
+                                                        styles.priorityDot,
+                                                        {
+                                                            backgroundColor: active
+                                                                ? tone.fg
+                                                                : Colors.border,
+                                                        },
+                                                    ]}
+                                                />
+                                                <Text
+                                                    style={[
+                                                        styles.priorityText,
+                                                        active && { color: tone.fg },
+                                                    ]}
+                                                >
+                                                    {p}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </Card>
+                        </View>
+
+                        {/* Photos */}
+                        <Card style={styles.card}>
+                            <SectionTitle
+                                title="Damage photos"
+                                action={
+                                    localPhotos.length > 0 ? (
+                                        <Text style={styles.photoCount}>
+                                            {localPhotos.length} attached
+                                        </Text>
+                                    ) : null
+                                }
+                            />
+
+                            <View style={styles.pickerRow}>
+                                <TouchableOpacity
+                                    style={styles.pickerOption}
+                                    onPress={handleTakePhoto}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.pickerIcon}>
+                                        <Ionicons name="camera" size={20} color={Colors.primary} />
+                                    </View>
+                                    <Text style={styles.pickerLabel}>Take photo</Text>
+                                    <Text style={styles.pickerHint}>Use the camera</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.pickerOption}
+                                    onPress={handlePickFromGallery}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.pickerIcon}>
+                                        <Ionicons name="images" size={20} color={Colors.primary} />
+                                    </View>
+                                    <Text style={styles.pickerLabel}>From gallery</Text>
+                                    <Text style={styles.pickerHint}>Pick existing</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {localPhotos.length > 0 && (
+                                <ScrollView
+                                    horizontal
+                                    style={styles.photoPreviewRow}
+                                    showsHorizontalScrollIndicator={false}
+                                >
+                                    {localPhotos.map((uri, idx) => (
+                                        <View key={idx} style={styles.photoWrapper}>
+                                            <Image source={{ uri }} style={styles.photoPreview} />
+                                            <TouchableOpacity
+                                                style={styles.removePhotoBtn}
+                                                onPress={() => handleRemovePhoto(idx)}
+                                                hitSlop={6}
+                                            >
+                                                <Ionicons
+                                                    name="close"
+                                                    size={12}
+                                                    color="#FFFFFF"
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            )}
+                        </Card>
+
+                        <Button
+                            label="Submit complaint"
+                            icon="paper-plane-outline"
+                            size="lg"
+                            fullWidth
+                            loading={submitting}
+                            onPress={handleSubmit}
+                        />
+                    </>
+                )}
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -475,6 +579,10 @@ export default function RaiseComplaintScreen() {
 const styles = StyleSheet.create({
     flex: {
         flex: 1,
+    },
+    headerBtn: {
+        marginHorizontal: 16,
+        padding: 4,
     },
     page: {
         flex: 1,
@@ -486,14 +594,31 @@ const styles = StyleSheet.create({
         // details card has been scrolled up to meet it.
         paddingBottom: 56,
     },
+    stepProgress: {
+        flexDirection: "row",
+        gap: 6,
+        marginBottom: 18,
+    },
+    stepSegment: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: Colors.borderLight,
+    },
+    stepSegmentActive: {
+        backgroundColor: Colors.primary,
+    },
+    nextBtn: {
+        marginTop: 22,
+    },
     card: {
         marginBottom: 16,
     },
     categoryBox: {
-        marginTop: 18,
+        marginTop: 6,
         borderTopWidth: 1,
         borderTopColor: Colors.borderLight,
-        paddingTop: 14,
+        paddingTop: 12,
     },
     categoryLabel: {
         fontSize: 11,
@@ -502,11 +627,6 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
         letterSpacing: 0.5,
         marginBottom: 10,
-    },
-    chipWrap: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
     },
     priorityRow: {
         flexDirection: "row",

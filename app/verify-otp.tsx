@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     },
     otpInputFocused: {
         borderColor: Colors.primary,
-        backgroundColor: "#F0F9FF",
+        backgroundColor: Colors.primaryLight,
     },
     verifyBtn: {
         marginBottom: 10,

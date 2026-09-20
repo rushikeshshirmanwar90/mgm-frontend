@@ -107,16 +107,11 @@ function RootLayoutNav() {
             <Stack.Screen
                 name="complaint/[id]"
                 options={{
-                    headerShown: true,
-                    title: "Complaint",
-                    headerBackTitle: "Back",
-                    headerStyle: { backgroundColor: Colors.surface },
-                    headerTintColor: Colors.primary,
-                    headerTitleStyle: {
-                        fontWeight: "800",
-                        fontSize: 17,
-                        color: Colors.textPrimary,
-                    },
+                    // This screen renders its own header (back button + a
+                    // "2 of 5, swipe for more" subtitle above the swipeable
+                    // ticket pager), since that subtitle needs to react to
+                    // which page is active.
+                    headerShown: false,
                 }}
             />
         </Stack>

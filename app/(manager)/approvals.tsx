@@ -12,9 +12,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import { User, UsersResponse } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Banner, Button, EmptyState } from "@/components/ui";
+import {
+    Banner,
+    Button,
+    EmptyState,
+    TAB_BAR_CLEARANCE,
+    useHideTabBarOnScroll,
+} from "@/components/ui";
 
 export default function StaffApprovalsScreen() {
+    const { onScroll, scrollEventThrottle } = useHideTabBarOnScroll();
     const [pendingUsers, setPendingUsers] = useState<User[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -91,6 +98,8 @@ export default function StaffApprovalsScreen() {
                 keyExtractor={(item) => item._id || item.id}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={scrollEventThrottle}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -233,7 +242,7 @@ const styles = StyleSheet.create({
     listContent: {
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 28,
+        paddingBottom: TAB_BAR_CLEARANCE,
     },
     intro: {
         fontSize: 12.5,
