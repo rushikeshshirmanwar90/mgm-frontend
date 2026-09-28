@@ -13,7 +13,7 @@ import {
     Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { BuildingFloorRoomPicker } from "@/components/BuildingFloorRoomPicker";
 import { RoomCodeSearch, RoomMatch } from "@/components/RoomCodeSearch";
@@ -161,7 +161,14 @@ export default function RaiseComplaintScreen() {
 
     const addAssets = (result: ImagePicker.ImagePickerResult) => {
         if (result.canceled || !result.assets) return;
-        setLocalPhotos((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+        const newPhotos = result.assets.map((a) => {
+            if (a.base64) {
+                const mime = a.mimeType || "image/jpeg";
+                return `data:${mime};base64,${a.base64}`;
+            }
+            return a.uri;
+        });
+        setLocalPhotos((prev) => [...prev, ...newPhotos]);
     };
 
     /** Opens the camera so damage can be photographed on the spot. */
@@ -181,7 +188,8 @@ export default function RaiseComplaintScreen() {
                     // `MediaTypeOptions` is deprecated in expo-image-picker 17;
                     // the array form is the supported API.
                     mediaTypes: ["images"],
-                    quality: 0.8,
+                    quality: 0.7,
+                    base64: true,
                 })
             );
         } catch (e) {
@@ -206,7 +214,8 @@ export default function RaiseComplaintScreen() {
                 await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ["images"],
                     allowsMultipleSelection: true,
-                    quality: 0.8,
+                    quality: 0.7,
+                    base64: true,
                 })
             );
         } catch (e) {

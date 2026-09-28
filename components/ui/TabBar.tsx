@@ -10,11 +10,20 @@ import {
     Text,
     View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import type {
-    BottomTabBarProps,
-    BottomTabNavigationOptions,
-} from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "expo-router";
+// Inline types to avoid importing @react-navigation (incompatible with expo-router SDK 57+)
+type BottomTabNavigationOptions = {
+    headerStyle?: object;
+    headerTitleStyle?: object;
+    headerTintColor?: string;
+    [key: string]: unknown;
+};
+type BottomTabBarProps = {
+    state: { routes: Array<{ key: string; name: string }>; index: number };
+    navigation: { emit: (e: any) => any; navigate: (name: string) => void };
+    insets: { bottom: number; top: number; left: number; right: number };
+    [key: string]: unknown;
+};
 import { Colors, Radius, Shadow } from "@/constants/theme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];

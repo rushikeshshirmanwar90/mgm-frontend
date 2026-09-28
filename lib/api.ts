@@ -1,29 +1,57 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
+import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 export const TOKEN_KEY = "mgm_token";
 export const USER_KEY = "mgm_user";
 
-function resolveBaseUrl(): string {
-    const fromEnv = process.env.EXPO_PUBLIC_API_URL;
-    if (fromEnv) {
-        return `${fromEnv.replace(/\/+$/, "")}/api`;
+function normalizeUrl(raw: string): string {
+    let url = raw.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = `http://${url}`;
     }
+    // Strip trailing slashes and /api so /api is attached consistently
+    return url.replace(/\/+$/, "").replace(/\/api$/, "");
+}
 
+function getLanHost(): string | null {
+    const hostUri =
+        Constants.expoConfig?.hostUri ??
+        (Constants as unknown as { manifest2?: { extra?: { expoClient?: { hostUri?: string } } } })?.manifest2?.extra?.expoClient?.hostUri ??
+        (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
+    const host = hostUri?.split(":")[0];
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+        return host;
+    }
+    return null;
+}
+
+export function resolveBaseUrl(): string {
+    const rawEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
     const port = process.env.EXPO_PUBLIC_API_PORT || "3000";
 
-    if (Platform.OS !== "web") {
-        // e.g. "192.168.1.42:8081" while running `expo start`.
-        const hostUri =
-            Constants.expoConfig?.hostUri ??
-            (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
-        const lanHost = hostUri?.split(":")[0];
+    if (rawEnv) {
+        let base = normalizeUrl(rawEnv);
 
-        if (lanHost && lanHost !== "localhost" && lanHost !== "127.0.0.1") {
+        // If 'localhost' or '127.0.0.1' was specified in env, but running on native device/emulator:
+        if (Platform.OS !== "web" && (base.includes("localhost") || base.includes("127.0.0.1"))) {
+            const lanHost = getLanHost();
+            if (lanHost) {
+                base = base.replace("localhost", lanHost).replace("127.0.0.1", lanHost);
+            } else if (Platform.OS === "android") {
+                base = base.replace("localhost", "10.0.2.2").replace("127.0.0.1", "10.0.2.2");
+            }
+        }
+        return `${base}/api`;
+    }
+
+    // Auto-detect when running on mobile
+    if (Platform.OS !== "web") {
+        const lanHost = getLanHost();
+        if (lanHost) {
             return `http://${lanHost}:${port}/api`;
         }
-
         if (Platform.OS === "android") {
             return `http://10.0.2.2:${port}/api`;
         }
@@ -78,12 +106,11 @@ export async function apiRequest<T = Record<string, unknown>>(
     let response: Response;
     try {
         response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
-    } catch {
-        // A network-level failure is by far the most common setup problem, so
-        // name the address we tried rather than surfacing "Network request
-        // failed" with no context.
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[MGM API Error] Failed to fetch ${BASE_URL}${endpoint}:`, msg);
         throw new ApiError(
-            `Cannot reach the server at ${BASE_URL}. Check that the backend is running and that EXPO_PUBLIC_API_URL is correct.`,
+            `Cannot reach the server at ${BASE_URL}${endpoint}. Check that mgm-backend is running ("npm run dev") and that EXPO_PUBLIC_API_URL is reachable.`,
             0
         );
     }
@@ -110,45 +137,71 @@ export async function apiRequest<T = Record<string, unknown>>(
     return data as T;
 }
 
-// ---- Cloudinary ----
-// Written straight into the source, the same way the real-estate project does it
-// (components/functions/image-handling.tsx and the Xsite material/bill-upload
-// route there both hardcode this cloud and preset).
-//
-// Nothing is given away by that. The preset is an UNSIGNED one, which is exactly
-// what makes it publishable — the API secret is never used by the app. And these
-// were EXPO_PUBLIC_* values before, which Expo inlines into the JS bundle at
-// build time regardless, so the .env indirection bought no secrecy at all — only
-// a setup step that had never been done (there was no .env here, so photo
-// uploads were silently disabled).
+
 const CLOUDINARY_CLOUD_NAME = "dlcq8i2sc";
 const CLOUDINARY_UPLOAD_PRESET = "realEstate";
 
-/**
- * Uploads a local image URI to Cloudinary and returns the hosted URL.
- *
- * Targets the cloud and unsigned preset configured at the top of this file.
- */
-export async function uploadImageToCloudinary(uri: string): Promise<string> {
-    const formData = new FormData();
+/** Converts any image URI (file://, content://, blob:) to a base64 Data URI */
+async function uriToDataUri(uri: string): Promise<string> {
+    if (uri.startsWith("data:")) return uri;
+    if (uri.startsWith("http://") || uri.startsWith("https://")) return uri;
 
-    if (Platform.OS === "web") {
-        const res = await fetch(uri);
-        const blob = await res.blob();
-        formData.append("file", blob, "photo.jpg");
-    } else {
-        formData.append("file", {
-            uri,
-            type: "image/jpeg",
-            name: "photo.jpg",
-        } as unknown as Blob);
+    // On native mobile (Android/iOS), read directly from local file:// or content:// via FileSystem
+    if (Platform.OS !== "web") {
+        try {
+            const base64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+            const ext = uri.split(".").pop()?.toLowerCase();
+            const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+            return `data:${mime};base64,${base64}`;
+        } catch (fsErr) {
+            console.warn("[MGM API] FileSystem read failed, attempting fetch fallback:", fsErr);
+        }
     }
 
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    // On Web or fallback
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (typeof reader.result === "string") {
+                resolve(reader.result);
+            } else {
+                reject(new Error("FileReader failed to convert image to Data URI"));
+            }
+        };
+        reader.onerror = () => reject(reader.error || new Error("Failed to read image"));
+        reader.readAsDataURL(blob);
+    });
+}
+
+/**
+ * Uploads an image (Data URI or local file URI) to Cloudinary and returns the hosted URL.
+ *
+ * Uses JSON body with Base64 Data URI to prevent React Native / Expo
+ * "Unsupported FormDataPart implementation" errors across all native platforms and web.
+ */
+export async function uploadImageToCloudinary(imageInput: string): Promise<string> {
+    if (imageInput.startsWith("http://") || imageInput.startsWith("https://")) {
+        return imageInput;
+    }
+
+    const dataUri = await uriToDataUri(imageInput);
 
     const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                file: dataUri,
+                upload_preset: CLOUDINARY_UPLOAD_PRESET,
+            }),
+        }
     );
 
     if (!res.ok) {

@@ -11,18 +11,29 @@ import { createTabBar, useTabScreenOptions } from "@/components/ui";
  * every other staff screen is a tab away from Home anyway, so this one
  * shortcut is enough without repeating it on every header.
  */
+import { Text, View } from "react-native";
+
 function HeaderProfileButton() {
     const router = useRouter();
+    const { user } = useAuth();
+    const initial = user?.name ? user.name.trim().charAt(0).toUpperCase() : null;
 
     return (
         <TouchableOpacity
             onPress={() => router.push("/(staff)/profile")}
             style={styles.profileBtn}
-            hitSlop={6}
+            hitSlop={8}
+            activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel="Open my profile"
         >
-            <Ionicons name="person-outline" size={24} color={Colors.textSecondary} />
+            {initial ? (
+                <View style={styles.avatarInner}>
+                    <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+            ) : (
+                <Ionicons name="person" size={18} color={Colors.primary} />
+            )}
         </TouchableOpacity>
     );
 }
@@ -120,8 +131,8 @@ const styles = StyleSheet.create({
         padding: 4,
     },
     profileBtn: {
-        width: 44,
-        height: 44,
+        width: 38,
+        height: 38,
         borderRadius: Radius.full,
         borderWidth: 1.5,
         borderColor: Colors.border,
@@ -129,5 +140,20 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         marginRight: 16,
+        overflow: "hidden",
+    },
+    avatarInner: {
+        width: "100%",
+        height: "100%",
+        borderRadius: Radius.full,
+        backgroundColor: Colors.primary,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    avatarText: {
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "800",
+        letterSpacing: -0.5,
     },
 });

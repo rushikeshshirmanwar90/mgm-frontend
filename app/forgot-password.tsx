@@ -110,16 +110,16 @@ export default function ForgotPasswordScreen() {
             }
 
             setSentTo(normalizedEmail);
-            setOtp("");
+            setOtp(res.devOtp || "");
             setCooldown(res.resendInSeconds ?? RESEND_SECONDS);
             if (advance) setStep("reset");
 
             setNotice({
                 tone: "success",
-                title: "Code sent",
-                message:
-                    res.message ||
-                    `If an account exists for ${normalizedEmail}, a code is on its way.`,
+                title: res.devOtp ? "Code generated" : "Code sent",
+                message: res.devOtp
+                    ? `Verification code: ${res.devOtp}`
+                    : (res.message || `If an account exists for ${normalizedEmail}, a code is on its way.`),
             });
         } catch (error) {
             // A 429 knows exactly how long is left; honour the server's clock

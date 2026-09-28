@@ -37,6 +37,7 @@ interface ForgotPasswordResult {
     emailSent: boolean;
     error?: string;
     resendInSeconds?: number;
+    devOtp?: string;
 }
 
 interface AuthContextType {
