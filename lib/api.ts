@@ -1,66 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 export const TOKEN_KEY = "mgm_token";
 export const USER_KEY = "mgm_user";
 
-function normalizeUrl(raw: string): string {
-    let url = raw.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = `http://${url}`;
-    }
-    // Strip trailing slashes and /api so /api is attached consistently
-    return url.replace(/\/+$/, "").replace(/\/api$/, "");
-}
+// ─── API Config ───────────────────────────────────────────────────────────────
+// Set USE_LOCAL to true  → uses your local backend (localhost:3000)
+// Set USE_LOCAL to false → uses the deployed production API
+const USE_LOCAL = false;
 
-function getLanHost(): string | null {
-    const hostUri =
-        Constants.expoConfig?.hostUri ??
-        (Constants as unknown as { manifest2?: { extra?: { expoClient?: { hostUri?: string } } } })?.manifest2?.extra?.expoClient?.hostUri ??
-        (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
-    const host = hostUri?.split(":")[0];
-    if (host && host !== "localhost" && host !== "127.0.0.1") {
-        return host;
-    }
-    return null;
-}
+const LOCAL_API_URL = "http://0.0.0.0:3000/api";
+const DEPLOYED_API_URL = "https://mgm-backend-six.vercel.app/api"; // 🔁 replace with your real deployed URL
 
-export function resolveBaseUrl(): string {
-    const rawEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
-    const port = process.env.EXPO_PUBLIC_API_PORT || "3000";
-
-    if (rawEnv) {
-        let base = normalizeUrl(rawEnv);
-
-        // If 'localhost' or '127.0.0.1' was specified in env, but running on native device/emulator:
-        if (Platform.OS !== "web" && (base.includes("localhost") || base.includes("127.0.0.1"))) {
-            const lanHost = getLanHost();
-            if (lanHost) {
-                base = base.replace("localhost", lanHost).replace("127.0.0.1", lanHost);
-            } else if (Platform.OS === "android") {
-                base = base.replace("localhost", "10.0.2.2").replace("127.0.0.1", "10.0.2.2");
-            }
-        }
-        return `${base}/api`;
-    }
-
-    // Auto-detect when running on mobile
-    if (Platform.OS !== "web") {
-        const lanHost = getLanHost();
-        if (lanHost) {
-            return `http://${lanHost}:${port}/api`;
-        }
-        if (Platform.OS === "android") {
-            return `http://10.0.2.2:${port}/api`;
-        }
-    }
-
-    return `http://localhost:${port}/api`;
-}
-
-export const BASE_URL = resolveBaseUrl();
+export const BASE_URL = USE_LOCAL ? LOCAL_API_URL : DEPLOYED_API_URL;
+// ──────────────────────────────────────────────────────────────────────────────
 
 export async function getAuthToken(): Promise<string | null> {
     try {
