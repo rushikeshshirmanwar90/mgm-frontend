@@ -119,10 +119,14 @@ export const Shadow = {
  * means a complaint's "resolved" green is the same green everywhere it appears.
  */
 export const StatusColors = {
-  pending:     { fg: Colors.warningDark, bg: Colors.warningLight, dot: Colors.warning, border: Colors.warningBorder, label: 'Pending' },
+  pending:     { fg: Colors.warningDark, bg: Colors.warningLight, dot: Colors.warning, border: Colors.warningBorder, label: 'Raised' },
+  awaiting_approval: { fg: '#1D4ED8',  bg: '#EFF6FF',            dot: '#3B82F6',      border: '#BFDBFE',             label: 'Awaiting Approval' },
+  approved:    { fg: '#0F766E',        bg: '#F0FDFA',            dot: '#14B8A6',      border: '#99F6E4',             label: 'Approved' },
+  work_done:   { fg: '#047857',        bg: '#ECFDF5',            dot: Colors.money,   border: '#A7F3D0',             label: 'Work Done' },
+  on_hold:     { fg: Colors.textBody,    bg: Colors.borderLight,  dot: Colors.textSecondary, border: Colors.border, label: 'On Hold' },
   in_progress: { fg: Colors.primaryDark, bg: Colors.primaryLight, dot: Colors.primary, border: Colors.primaryBorder, label: 'In Progress' },
   resolved:    { fg: Colors.successDark, bg: Colors.successLight, dot: Colors.success, border: Colors.successBorder, label: 'Resolved' },
-  rejected:    { fg: Colors.errorDark,   bg: Colors.errorLight,   dot: Colors.error,   border: Colors.errorBorder,   label: 'Rejected' },
+  rejected:    { fg: Colors.errorDark,   bg: Colors.errorLight,   dot: Colors.error,   border: Colors.errorBorder,   label: 'Closed' },
 } as const;
 
 export const PriorityColors = {

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Complaint } from "@/lib/types";
+import { categoryLabel, costLines } from "@/lib/workflow";
 import { Colors, PriorityColors, Radius, Shadow, StatusColors, inr } from "@/constants/theme";
 import { StatusBadge } from "./StatusBadge";
 import { IconChip } from "./ui/IconChip";
@@ -10,6 +11,8 @@ interface ComplaintCardProps {
     complaint: Complaint;
     onPress?: () => void;
     showCost?: boolean;
+    /** Show the estimated budget prominently (the Director's view). */
+    showEstimate?: boolean;
     /** Manager/admin control bar docked to the bottom of the card. */
     footer?: React.ReactNode;
 }
@@ -28,6 +31,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({
     complaint,
     onPress,
     showCost = false,
+    showEstimate = false,
     footer,
 }) => {
     const buildingName =
@@ -42,6 +46,8 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({
 
     const costDetails = complaint.costDetails;
     const hasCost = showCost && !!costDetails && costDetails.totalCost > 0;
+    const estimate = complaint.estimatedBudget ?? 0;
+    const category = categoryLabel(complaint);
 
     const accent = StatusColors[complaint.status]?.dot ?? Colors.primary;
     const priority = PriorityColors[complaint.priority] ?? PriorityColors.low;
@@ -74,6 +80,7 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({
                     <Text style={styles.title} numberOfLines={2}>
                         {complaint.title}
                     </Text>
+                    {category && <Text style={styles.category}>{category}</Text>}
                     <Text style={styles.description} numberOfLines={2}>
                         {complaint.description}
                     </Text>
@@ -123,6 +130,21 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({
                         </View>
                     )}
 
+                    {/* Estimated budget — what the Director approves against */}
+                    {showEstimate && estimate > 0 && (
+                        <View style={styles.estimatePanel}>
+                            <View style={styles.estimateText}>
+                                <Text style={styles.estimateLabel}>Estimated budget</Text>
+                                {complaint.estimateNotes ? (
+                                    <Text style={styles.estimateNotes} numberOfLines={2}>
+                                        {complaint.estimateNotes}
+                                    </Text>
+                                ) : null}
+                            </View>
+                            <Text style={styles.estimateValue}>{inr(estimate)}</Text>
+                        </View>
+                    )}
+
                     {/* Cost breakdown */}
                     {hasCost && (
                         <View style={styles.costPanel}>
@@ -132,21 +154,17 @@ export const ComplaintCard: React.FC<ComplaintCardProps> = ({
                                     color={Colors.money}
                                     size={20}
                                 />
-                                <Text style={styles.costLabel}>Repair Cost</Text>
+                                <Text style={styles.costLabel}>Expenditure</Text>
                                 <Text style={styles.costTotal}>{inr(costDetails!.totalCost)}</Text>
                             </View>
 
                             <View style={styles.costGrid}>
-                                {(
-                                    [
-                                        ["Labor", costDetails!.laborCost],
-                                        ["Material", costDetails!.materialCost],
-                                        ["Other", costDetails!.otherCost],
-                                    ] as const
-                                ).map(([label, value]) => (
-                                    <View key={label} style={styles.costCell}>
-                                        <Text style={styles.costCellLabel}>{label}</Text>
-                                        <Text style={styles.costCellValue}>{inr(value || 0)}</Text>
+                                {costLines(costDetails!).map((line) => (
+                                    <View key={line.label} style={styles.costCell}>
+                                        <Text style={styles.costCellLabel} numberOfLines={1}>
+                                            {line.label}
+                                        </Text>
+                                        <Text style={styles.costCellValue}>{inr(line.amount)}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -219,6 +237,47 @@ const styles = StyleSheet.create({
         color: Colors.textPrimary,
         letterSpacing: -0.3,
         marginBottom: 3,
+    },
+    category: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: Colors.primary,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        marginBottom: 4,
+    },
+    estimatePanel: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        backgroundColor: Colors.primaryLight,
+        borderWidth: 1,
+        borderColor: Colors.primaryBorder,
+        borderRadius: Radius.lg,
+        padding: 14,
+        marginBottom: 12,
+    },
+    estimateText: {
+        flex: 1,
+    },
+    estimateLabel: {
+        fontSize: 10.5,
+        fontWeight: "700",
+        color: Colors.primaryDark,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    estimateNotes: {
+        fontSize: 12,
+        color: Colors.textBody,
+        marginTop: 3,
+        lineHeight: 16,
+    },
+    estimateValue: {
+        fontSize: 22,
+        fontWeight: "800",
+        color: Colors.primaryDark,
+        letterSpacing: -0.6,
     },
     description: {
         fontSize: 13,
@@ -298,10 +357,12 @@ const styles = StyleSheet.create({
     },
     costGrid: {
         flexDirection: "row",
-        gap: 8,
+        flexWrap: "wrap",
+        rowGap: 8,
     },
     costCell: {
-        flex: 1,
+        width: "33.33%",
+        paddingRight: 6,
     },
     costCellLabel: {
         fontSize: 10,

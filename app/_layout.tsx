@@ -25,12 +25,14 @@ const PUBLIC_ROUTES = ["login", "register", "verify-otp", "forgot-password"];
 const HOME_FOR_ROLE = {
     admin: "/(admin)",
     manager: "/(manager)",
+    director: "/(director)",
     staff: "/(staff)",
 } as const satisfies Record<UserRole, string>;
 
 const GROUP_FOR_ROLE: Record<UserRole, string> = {
     admin: "(admin)",
     manager: "(manager)",
+    director: "(director)",
     staff: "(staff)",
 };
 
@@ -103,6 +105,7 @@ function RootLayoutNav() {
             <Stack.Screen name="forgot-password" />
             <Stack.Screen name="(staff)" />
             <Stack.Screen name="(manager)" />
+            <Stack.Screen name="(director)" />
             <Stack.Screen name="(admin)" />
             <Stack.Screen
                 name="complaint/[id]"

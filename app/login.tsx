@@ -15,7 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/lib/api";
 import { useRouter } from "expo-router";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Button, TextField } from "@/components/ui";
+import { Button, Credit, TextField } from "@/components/ui";
 
 export default function LoginScreen() {
     const { login } = useAuth();
@@ -46,6 +46,7 @@ export default function LoginScreen() {
 
             if (user.role === "admin") router.replace("/(admin)");
             else if (user.role === "manager") router.replace("/(manager)");
+            else if (user.role === "director") router.replace("/(director)");
             else router.replace("/(staff)");
         } catch (error) {
             const message =
@@ -81,74 +82,78 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Brand */}
-                    <View style={styles.header}>
-                        <View style={styles.logoMark}>
-                            <Ionicons name="business" size={28} color="#FFFFFF" />
+                    <View style={styles.main}>
+                        {/* Brand */}
+                        <View style={styles.header}>
+                            <View style={styles.logoMark}>
+                                <Ionicons name="business" size={28} color="#FFFFFF" />
+                            </View>
+                            <Text style={styles.title}>MGM Maintenance</Text>
+                            <Text style={styles.subtitle}>
+                                Campus infrastructure & complaint management
+                            </Text>
                         </View>
-                        <Text style={styles.title}>MGM Maintenance</Text>
-                        <Text style={styles.subtitle}>
-                            Campus infrastructure & complaint management
-                        </Text>
-                    </View>
 
-                    {/* Sign-in form */}
-                    <View style={styles.formCard}>
-                        <Text style={styles.formTitle}>Welcome back</Text>
-                        <Text style={styles.formSubtitle}>
-                            Sign in to report and track campus issues.
-                        </Text>
+                        {/* Sign-in form */}
+                        <View style={styles.formCard}>
+                            <Text style={styles.formTitle}>Welcome back</Text>
+                            <Text style={styles.formSubtitle}>
+                                Sign in to report and track campus issues.
+                            </Text>
 
-                        <TextField
-                            label="Email address"
-                            icon="mail-outline"
-                            value={email}
-                            onChangeText={setEmail}
-                            placeholder="staff@mgm.edu"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoComplete="email"
-                        />
+                            <TextField
+                                label="Email address"
+                                icon="mail-outline"
+                                value={email}
+                                onChangeText={setEmail}
+                                placeholder="staff@mgm.edu"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                            />
 
-                        <TextField
-                            label="Password"
-                            icon="lock-closed-outline"
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="••••••••"
-                            isPassword
-                            autoCapitalize="none"
-                        />
+                            <TextField
+                                label="Password"
+                                icon="lock-closed-outline"
+                                value={password}
+                                onChangeText={setPassword}
+                                placeholder="••••••••"
+                                isPassword
+                                autoCapitalize="none"
+                            />
 
-                        <TouchableOpacity
-                            style={styles.forgotPassBtn}
-                            onPress={() => router.push("/forgot-password")}
-                            hitSlop={8}
-                        >
-                            <Text style={styles.forgotPassText}>Forgot password?</Text>
-                        </TouchableOpacity>
-
-                        <Button
-                            label="Sign In"
-                            icon="arrow-forward"
-                            iconAfter
-                            size="lg"
-                            fullWidth
-                            loading={loading}
-                            onPress={handleLogin}
-                            style={styles.signInBtn}
-                        />
-
-                        <View style={styles.registerRow}>
-                            <Text style={styles.registerText}>Are you a staff member?</Text>
                             <TouchableOpacity
-                                onPress={() => router.push("/register")}
+                                style={styles.forgotPassBtn}
+                                onPress={() => router.push("/forgot-password")}
                                 hitSlop={8}
                             >
-                                <Text style={styles.registerLink}> Register here</Text>
+                                <Text style={styles.forgotPassText}>Forgot password?</Text>
                             </TouchableOpacity>
+
+                            <Button
+                                label="Sign In"
+                                icon="arrow-forward"
+                                iconAfter
+                                size="lg"
+                                fullWidth
+                                loading={loading}
+                                onPress={handleLogin}
+                                style={styles.signInBtn}
+                            />
+
+                            <View style={styles.registerRow}>
+                                <Text style={styles.registerText}>Are you a staff member?</Text>
+                                <TouchableOpacity
+                                    onPress={() => router.push("/register")}
+                                    hitSlop={8}
+                                >
+                                    <Text style={styles.registerLink}> Register here</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
+
+                    <Credit style={styles.credit} />
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -166,6 +171,9 @@ const styles = StyleSheet.create({
     container: {
         flexGrow: 1,
         padding: 24,
+    },
+    main: {
+        flex: 1,
         justifyContent: "center",
     },
     header: {
@@ -246,5 +254,8 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: "700",
         color: Colors.primary,
+    },
+    credit: {
+        marginTop: 8,
     },
 });

@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/api";
 import { AppNotification, NotificationsResponse } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { EmptyState, IconChip, TAB_BAR_CLEARANCE, useHideTabBarOnScroll } from "@/components/ui";
+import { Credit, EmptyState, IconChip, TAB_BAR_CLEARANCE, useHideTabBarOnScroll } from "@/components/ui";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -88,6 +88,7 @@ export default function NotificationsScreen() {
             <FlatList
                 data={notifications}
                 keyExtractor={(item) => item._id}
+                ListFooterComponent={<Credit />}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 onScroll={onScroll}
@@ -140,7 +141,7 @@ export default function NotificationsScreen() {
                     <EmptyState
                         icon="notifications-outline"
                         title="No notifications yet"
-                        message="Updates land here when your complaints move forward or get resolved."
+                        message="Updates land here when complaints you’re involved in move forward or get resolved."
                         style={styles.empty}
                     />
                 }

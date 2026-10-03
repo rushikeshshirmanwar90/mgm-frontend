@@ -1,9 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Colors, Radius, StatusColors } from "@/constants/theme";
+import { Complaint } from "@/lib/types";
 
 interface StatusBadgeProps {
-    status: "pending" | "in_progress" | "resolved" | "rejected";
+    status: Complaint["status"];
     size?: "sm" | "md";
 }
 

@@ -7,6 +7,7 @@ import { ComplaintCard } from "@/components/ComplaintCard";
 import { Colors } from "@/constants/theme";
 import {
     Banner,
+    Credit,
     EmptyState,
     Screen,
     SectionTitle,
@@ -17,7 +18,8 @@ export default function ManagerDashboard() {
     const router = useRouter();
 
     const [stats, setStats] = useState({
-        pending: 0,
+        needsAction: 0,
+        awaitingDirector: 0,
         in_progress: 0,
         resolved: 0,
         pendingApprovals: 0,
@@ -40,15 +42,20 @@ export default function ManagerDashboard() {
             setRecentComplaints(complaints.slice(0, 3));
             setAllComplaintIds(complaints.map((c) => c._id));
 
-            const pending = complaints.filter((c) => c.status === "pending").length;
-            const in_progress = complaints.filter((c) => c.status === "in_progress").length;
-            const resolved = complaints.filter((c) => c.status === "resolved").length;
+            const count = (...s: Complaint["status"][]) =>
+                complaints.filter((c) => s.includes(c.status)).length;
+            // "Needs action" is anything waiting on the Estate Manager: an
+            // estimate to add, approved work to start, or expenditure to enter.
+            const needsAction = count("pending", "approved", "work_done");
+            const awaitingDirector = count("awaiting_approval");
+            const in_progress = count("in_progress");
+            const resolved = count("resolved");
 
             // Fetch pending staff approvals
             const usersData = await apiRequest<UsersResponse>("/users?status=pending");
             const pendingApprovals = (usersData.users || []).length;
 
-            setStats({ pending, in_progress, resolved, pendingApprovals });
+            setStats({ needsAction, awaitingDirector, in_progress, resolved, pendingApprovals });
         } catch (e) {
             console.error("Manager dashboard error", e);
         } finally {
@@ -76,8 +83,15 @@ export default function ManagerDashboard() {
                 <StatCard
                     icon="time-outline"
                     color={Colors.warning}
-                    value={stats.pending}
-                    label="Pending action"
+                    value={stats.needsAction}
+                    label="Needs your action"
+                    style={styles.statCard}
+                />
+                <StatCard
+                    icon="hourglass-outline"
+                    color="#3B82F6"
+                    value={stats.awaitingDirector}
+                    label="Awaiting director"
                     style={styles.statCard}
                 />
                 <StatCard
@@ -98,7 +112,7 @@ export default function ManagerDashboard() {
                     icon="people-outline"
                     color={Colors.textSecondary}
                     value={stats.pendingApprovals}
-                    label="Awaiting approval"
+                    label="New staff requests"
                     style={styles.statCard}
                 />
             </View>
@@ -125,6 +139,8 @@ export default function ManagerDashboard() {
                     />
                 ))
             )}
+
+            <Credit />
         </Screen>
     );
 }

@@ -2,6 +2,7 @@ export { Banner } from "./Banner";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { Chip, ChipGroup } from "./Chip";
+export { Credit } from "./Credit";
 export { EmptyState } from "./EmptyState";
 export { HowItWorks } from "./HowItWorks";
 export { IconChip } from "./IconChip";

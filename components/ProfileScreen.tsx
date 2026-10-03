@@ -24,6 +24,11 @@ const ROLE_META: Record<UserRole, { label: string; blurb: string; icon: IoniconN
         blurb: "Oversees complaints, costs and staff access",
         icon: "briefcase",
     },
+    director: {
+        label: "Director",
+        blurb: "Approves the estimated budget for each complaint",
+        icon: "ribbon",
+    },
     admin: {
         label: "Administrator",
         blurb: "Campus executive and financial controller",

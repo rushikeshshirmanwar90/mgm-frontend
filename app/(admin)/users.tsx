@@ -28,13 +28,14 @@ import {
     useHideTabBarOnScroll,
 } from "@/components/ui";
 
-type FilterKey = "all" | "staff" | "manager" | "admin" | "pending" | "rejected";
+type FilterKey = "all" | "staff" | "manager" | "director" | "admin" | "pending" | "rejected";
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const FILTERS: { key: FilterKey; label: string; query: string }[] = [
     { key: "all", label: "All", query: "" },
     { key: "staff", label: "Staff", query: "?role=staff" },
     { key: "manager", label: "Managers", query: "?role=manager" },
+    { key: "director", label: "Directors", query: "?role=director" },
     { key: "admin", label: "Admins", query: "?role=admin" },
     { key: "pending", label: "Pending", query: "?status=pending" },
     { key: "rejected", label: "Rejected", query: "?status=rejected" },
@@ -43,6 +44,7 @@ const FILTERS: { key: FilterKey; label: string; query: string }[] = [
 const ROLE_STYLES: Record<UserRole, { bg: string; fg: string; icon: IoniconName }> = {
     admin: { bg: Colors.primaryLight, fg: Colors.primaryDark, icon: "shield-checkmark" },
     manager: { bg: Colors.warningLight, fg: Colors.warningDark, icon: "briefcase" },
+    director: { bg: "#F0FDFA", fg: "#0F766E", icon: "ribbon" },
     staff: { bg: Colors.successLight, fg: Colors.successDark, icon: "person" },
 };
 
@@ -325,7 +327,7 @@ export default function AdminUsersScreen() {
                         >
                             <Text style={styles.fieldLabel}>Role</Text>
                             <View style={styles.roleRow}>
-                                {(["staff", "manager", "admin"] as const).map((r) => {
+                                {(["staff", "manager", "director", "admin"] as const).map((r) => {
                                     const active = role === r;
                                     const tone = ROLE_STYLES[r];
                                     return (
@@ -626,11 +628,14 @@ const styles = StyleSheet.create({
     },
     roleRow: {
         flexDirection: "row",
+        flexWrap: "wrap",
         gap: 8,
         marginBottom: 18,
     },
     roleChip: {
-        flex: 1,
+        // Two per row: four roles don't fit side by side on a narrow phone.
+        width: "48%",
+        flexGrow: 1,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",

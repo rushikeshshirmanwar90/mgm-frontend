@@ -10,6 +10,7 @@ import { ApprovalStatusNotice } from "@/components/ApprovalStatusNotice";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import {
     Banner,
+    Credit,
     EmptyState,
     Screen,
     SectionTitle,
@@ -43,10 +44,15 @@ export default function StaffDashboard() {
             setRecentComplaints(complaints.slice(0, 3));
             setAllComplaintIds(complaints.map((c) => c._id));
 
-            const pending = complaints.filter((c) => c.status === "pending").length;
-            const in_progress = complaints.filter((c) => c.status === "in_progress").length;
-            const resolved = complaints.filter((c) => c.status === "resolved").length;
-            setStats({ pending, in_progress, resolved });
+            // Three tiles a reporter cares about: not started yet (still being
+            // reviewed, approved or paused), being fixed, and done.
+            const count = (...s: Complaint["status"][]) =>
+                complaints.filter((c) => s.includes(c.status)).length;
+            setStats({
+                pending: count("pending", "awaiting_approval", "approved", "on_hold"),
+                in_progress: count("in_progress", "work_done"),
+                resolved: count("resolved"),
+            });
 
             const notifData = await apiRequest<NotificationsResponse>("/notifications");
             setUnreadNotifs(notifData.unreadCount || 0);
@@ -67,6 +73,7 @@ export default function StaffDashboard() {
         return (
             <Screen scroll refreshing={refreshing} onRefresh={loadDashboardData}>
                 <ApprovalStatusNotice />
+                <Credit />
             </Screen>
         );
     }
@@ -148,6 +155,8 @@ export default function StaffDashboard() {
                     />
                 ))
             )}
+
+            <Credit />
         </Screen>
 
             {/* Report an issue. Lives here instead of on the tab bar so the

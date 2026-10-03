@@ -5,7 +5,7 @@ import { useRouter, type Href } from "expo-router";
 import { apiRequest } from "@/lib/api";
 import { BuildingsResponse, Complaint, ComplaintsResponse } from "@/lib/types";
 import { Colors, Radius, Shadow } from "@/constants/theme";
-import { Screen, SectionTitle, StatCard } from "@/components/ui";
+import { Credit, Screen, SectionTitle, StatCard } from "@/components/ui";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -59,9 +59,13 @@ export default function AdminDashboard() {
             const data = await apiRequest<ComplaintsResponse>("/complaints");
             const complaints: Complaint[] = data.complaints || [];
 
-            const pending = complaints.filter((c) => c.status === "pending").length;
-            const in_progress = complaints.filter((c) => c.status === "in_progress").length;
-            const resolved = complaints.filter((c) => c.status === "resolved").length;
+            const count = (...s: Complaint["status"][]) =>
+                complaints.filter((c) => s.includes(c.status)).length;
+            // Not started covers everything before work begins, including
+            // complaints waiting on the Director.
+            const pending = count("pending", "awaiting_approval", "approved", "on_hold");
+            const in_progress = count("in_progress", "work_done");
+            const resolved = count("resolved");
 
             const bData = await apiRequest<BuildingsResponse>("/buildings");
             const totalBuildings = (bData.buildings || []).length;
@@ -149,6 +153,8 @@ export default function AdminDashboard() {
                     </TouchableOpacity>
                 ))}
             </View>
+
+            <Credit />
         </Screen>
     );
 }

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Complaint } from "@/lib/types";
 import { Colors, Radius, StatusColors } from "@/constants/theme";
+import { categoryLabel } from "@/lib/workflow";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -36,17 +37,14 @@ interface ComplaintTicketProps {
     assigneeName?: string;
     photoCount: number;
     onPressPhotos?: () => void;
-    progressVisible?: boolean;
-    onPressProgress?: () => void;
 }
 
 /**
- * A ticket/boarding-pass styled summary: a full-width photo banner up top
- * (so the title and facts below always get the full card width to lay out
- * in, rather than being squeezed beside a thumbnail), a perforated seam that
- * scrolls down to the status & progress section below (rather than growing
- * the card itself), what was reported, and a boarding-pass-style facts row
- * (building / floor / room).
+ * A ticket/boarding-pass styled summary: a full-width photo banner with the
+ * complaint's title across the top of it as the header, a perforated seam,
+ * then the details — category, location, priority, date, what was reported,
+ * and a boarding-pass-style facts row (building / floor / room). Status &
+ * progress always sit in their own section below the ticket.
  */
 export const ComplaintTicket: React.FC<ComplaintTicketProps> = ({
     complaint,
@@ -60,8 +58,6 @@ export const ComplaintTicket: React.FC<ComplaintTicketProps> = ({
     assigneeName,
     photoCount,
     onPressPhotos,
-    progressVisible,
-    onPressProgress,
 }) => {
     const locationIcon = LOCATION_ICONS[complaint.locationType] ?? "location-outline";
     const thumbnail = complaint.photos?.[0];
@@ -81,6 +77,7 @@ export const ComplaintTicket: React.FC<ComplaintTicketProps> = ({
     const locationLabel =
         complaint.locationType.charAt(0).toUpperCase() + complaint.locationType.slice(1);
     const reference = complaint._id.slice(-6).toUpperCase();
+    const category = categoryLabel(complaint);
 
     return (
         <View style={styles.wrap}>
@@ -95,9 +92,20 @@ export const ComplaintTicket: React.FC<ComplaintTicketProps> = ({
                         <Image source={{ uri: thumbnail }} style={styles.banner} />
                     ) : (
                         <View style={[styles.banner, styles.bannerPlaceholder]}>
-                            <Ionicons name={locationIcon} size={34} color={Colors.primary} />
+                            <Ionicons
+                                name={locationIcon}
+                                size={40}
+                                color="rgba(255,255,255,0.35)"
+                            />
                         </View>
                     )}
+
+                    {/* Title across the top of the photo, like a header */}
+                    <View style={styles.bannerHead}>
+                        <Text style={styles.title} numberOfLines={3}>
+                            {complaint.title}
+                        </Text>
+                    </View>
                     {photoCount > 0 && (
                         <View style={styles.bannerPill}>
                             <Ionicons name="images" size={11} color="#FFFFFF" />
@@ -116,39 +124,25 @@ export const ComplaintTicket: React.FC<ComplaintTicketProps> = ({
                     )}
                 </TouchableOpacity>
 
-                {/* Title + meta — full card width, nothing squeezed beside it */}
-                <View style={styles.headBlock}>
-                    <Text style={styles.title}>{complaint.title}</Text>
-                    <Text style={styles.metaLine}>
-                        {locationLabel} · {complaint.priority} priority · {dateLabel} at{" "}
-                        {timeLabel}
-                    </Text>
-                </View>
-
-                {/* Perforated seam — toggles the Status & progress card below */}
+                {/* Perforated seam */}
                 <View style={styles.seam}>
                     <View style={styles.notch} />
                     <View style={styles.dashLine} />
                     <View style={[styles.notch, styles.notchRight]} />
                 </View>
-                <TouchableOpacity
-                    style={styles.seamBarWrap}
-                    onPress={onPressProgress}
-                    activeOpacity={0.75}
-                >
-                    <View style={styles.seamBar}>
-                        <Text style={styles.seamBarText}>
-                            {progressVisible
-                                ? "Hide status & progress"
-                                : "Tap to see status & progress"}
-                        </Text>
-                        <Ionicons
-                            name={progressVisible ? "chevron-up" : "chevron-down"}
-                            size={14}
-                            color={Colors.primaryDark}
-                        />
-                    </View>
-                </TouchableOpacity>
+
+                {/* Category, location, priority and when — in the ticket, not the header */}
+                <View style={styles.metaBlock}>
+                    {category && (
+                        <View style={styles.categoryTag}>
+                            <Text style={styles.categoryTagText}>{category}</Text>
+                        </View>
+                    )}
+                    <Text style={styles.metaLine}>
+                        {locationLabel} · {complaint.priority} priority · {dateLabel} at{" "}
+                        {timeLabel}
+                    </Text>
+                </View>
 
                 {/* What was reported */}
                 <View style={styles.reportedBlock}>
@@ -226,12 +220,45 @@ const styles = StyleSheet.create({
     },
     banner: {
         width: "100%",
-        height: 150,
+        height: 210,
         backgroundColor: Colors.borderLight,
     },
     bannerPlaceholder: {
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-end",
+        paddingBottom: 44,
+        backgroundColor: Colors.primaryDark,
+    },
+    bannerHead: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 14,
+        // A flat scrim rather than a gradient keeps the title legible on any
+        // photo without pulling in a gradient dependency.
+        backgroundColor: "rgba(15,23,42,0.62)",
+    },
+    metaBlock: {
+        paddingHorizontal: 16,
+        marginBottom: 16,
+    },
+    categoryTag: {
+        alignSelf: "flex-start",
+        backgroundColor: Colors.primaryLight,
+        borderRadius: Radius.full,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginBottom: 8,
+    },
+    categoryTagText: {
+        fontSize: 10.5,
+        fontWeight: "800",
+        color: Colors.primaryDark,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
     },
     bannerPill: {
         position: "absolute",
@@ -253,7 +280,7 @@ const styles = StyleSheet.create({
     statusPill: {
         position: "absolute",
         right: 12,
-        top: 12,
+        bottom: 12,
         flexDirection: "row",
         alignItems: "center",
         gap: 5,
@@ -272,21 +299,16 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
         letterSpacing: 0.3,
     },
-    headBlock: {
-        padding: 16,
-        paddingBottom: 4,
-    },
     title: {
-        fontSize: 17,
+        fontSize: 19,
         fontWeight: "800",
-        color: Colors.textPrimary,
+        color: "#FFFFFF",
         letterSpacing: -0.3,
-        lineHeight: 22,
+        lineHeight: 24,
     },
     metaLine: {
         fontSize: 12.5,
         color: Colors.textSecondary,
-        marginTop: 6,
         fontWeight: "600",
         lineHeight: 18,
         textTransform: "capitalize",
@@ -295,6 +317,7 @@ const styles = StyleSheet.create({
         height: NOTCH_SIZE,
         justifyContent: "center",
         marginTop: 10,
+        marginBottom: 12,
     },
     notch: {
         position: "absolute",
@@ -314,25 +337,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 1.5,
         borderStyle: "dashed",
         borderColor: Colors.border,
-    },
-    seamBarWrap: {
-        paddingHorizontal: 16,
-        marginTop: 14,
-        marginBottom: 16,
-    },
-    seamBar: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        paddingVertical: 11,
-        borderRadius: Radius.full,
-        backgroundColor: Colors.primaryLight,
-    },
-    seamBarText: {
-        fontSize: 12.5,
-        fontWeight: "700",
-        color: Colors.primaryDark,
     },
     reportedBlock: {
         paddingHorizontal: 16,

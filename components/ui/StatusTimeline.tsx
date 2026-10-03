@@ -2,9 +2,9 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Colors, Radius } from "@/constants/theme";
+import { Complaint, ComplaintStatus } from "@/lib/types";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
-type Status = "pending" | "in_progress" | "resolved" | "rejected";
 
 interface Step {
     key: string;
@@ -15,14 +15,12 @@ interface Step {
     state: "done" | "current" | "upcoming";
     date?: string;
     color: string;
+    /** A note shown in a box under the step (hold reason, closing reason). */
+    note?: { label: string; text: string; tone: "neutral" | "error" };
 }
 
 interface StatusTimelineProps {
-    status: Status;
-    createdAt: string;
-    resolvedAt?: string;
-    updatedAt?: string;
-    rejectionReason?: string;
+    complaint: Complaint;
     style?: StyleProp<ViewStyle>;
 }
 
@@ -44,17 +42,11 @@ function formatDate(value?: string): string | undefined {
  *
  * Status was previously communicated only by a coloured pill reading "pending"
  * or "in_progress", which tells a reporter nothing about what happens next or
- * how far along their issue is. This lays the lifecycle out explicitly.
+ * how far along their issue is. This lays the lifecycle out explicitly:
+ * raised, approved, in progress, work done, resolved.
  */
-export const StatusTimeline: React.FC<StatusTimelineProps> = ({
-    status,
-    createdAt,
-    resolvedAt,
-    updatedAt,
-    rejectionReason,
-    style,
-}) => {
-    const steps = buildSteps(status, createdAt, resolvedAt, updatedAt);
+export const StatusTimeline: React.FC<StatusTimelineProps> = ({ complaint, style }) => {
+    const steps = buildSteps(complaint);
 
     return (
         <View style={style}>
@@ -117,10 +109,29 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
 
                             {step.date && <Text style={styles.date}>{step.date}</Text>}
 
-                            {step.key === "rejected" && rejectionReason ? (
-                                <View style={styles.reasonBox}>
-                                    <Text style={styles.reasonLabel}>Reason given</Text>
-                                    <Text style={styles.reasonText}>{rejectionReason}</Text>
+                            {step.note ? (
+                                <View
+                                    style={[
+                                        styles.reasonBox,
+                                        step.note.tone === "neutral" && styles.holdBox,
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.reasonLabel,
+                                            step.note.tone === "neutral" && styles.holdText,
+                                        ]}
+                                    >
+                                        {step.note.label}
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.reasonText,
+                                            step.note.tone === "neutral" && styles.holdText,
+                                        ]}
+                                    >
+                                        {step.note.text}
+                                    </Text>
                                 </View>
                             ) : null}
                         </View>
@@ -131,25 +142,30 @@ export const StatusTimeline: React.FC<StatusTimelineProps> = ({
     );
 };
 
-function buildSteps(
-    status: Status,
-    createdAt: string,
-    resolvedAt?: string,
-    updatedAt?: string
-): Step[] {
+/** Position of each stage on the main path, for deciding done / current / upcoming. */
+const ORDER: Partial<Record<ComplaintStatus, number>> = {
+    pending: 1,
+    awaiting_approval: 1,
+    approved: 2,
+    in_progress: 3,
+    work_done: 4,
+    resolved: 5,
+};
+
+function buildSteps(c: Complaint): Step[] {
     const reported: Step = {
         key: "reported",
-        label: "Reported",
-        detail: "You submitted this issue to the Estate Manager.",
+        label: "Complaint raised",
+        detail: "Submitted to the Estate Manager.",
         icon: "create-outline",
         state: "done",
-        date: formatDate(createdAt),
+        date: formatDate(c.createdAt),
         color: Colors.primary,
     };
 
-    // Rejection is a terminal branch, not a stage on the repair path — showing
-    // it as a third "step" would imply the work was done.
-    if (status === "rejected") {
+    // Closing without repair is a legacy terminal branch, not a stage on the
+    // repair path — showing it as a later "step" would imply work was done.
+    if (c.status === "rejected") {
         return [
             reported,
             {
@@ -158,40 +174,98 @@ function buildSteps(
                 detail: "The team reviewed this and decided no repair work was needed.",
                 icon: "close",
                 state: "current",
-                date: formatDate(updatedAt),
+                date: formatDate(c.updatedAt),
                 color: Colors.error,
+                note: c.rejectionReason
+                    ? { label: "Reason given", text: c.rejectionReason, tone: "error" }
+                    : undefined,
             },
         ];
     }
 
-    const started = status === "in_progress" || status === "resolved";
-    const done = status === "resolved";
+    // A held complaint is laid out as the stage it paused in, with the hold
+    // itself as the current step.
+    const onHold = c.status === "on_hold";
+    const effective: ComplaintStatus = onHold ? (c.heldFrom ?? "pending") : c.status;
+    const at = ORDER[effective] ?? 1;
+    const stateOf = (pos: number): Step["state"] =>
+        effective === "resolved" || pos < at ? "done" : pos === at && !onHold ? "current" : "upcoming";
 
-    return [
+    const approval: Step = {
+        key: "approval",
+        label: "Approved",
+        detail:
+            at > 1
+                ? "The estimate was approved by the Director."
+                : effective === "awaiting_approval"
+                  ? "The estimate has been sent to the Director for approval."
+                  : "The Estate Manager is reviewing this and preparing an estimate for approval.",
+        icon: at > 1 ? "checkmark-done" : "hourglass-outline",
+        // Done only once the Director has signed off; until then it's the
+        // stage being waited on (unless the whole complaint is paused).
+        state: at > 1 ? "done" : onHold ? "upcoming" : "current",
+        date: at > 1 ? formatDate(c.approvedAt) : undefined,
+        color: at > 1 ? "#14B8A6" : Colors.warning,
+    };
+
+    const steps: Step[] = [
         reported,
+        approval,
         {
             key: "in_progress",
-            label: "Work in progress",
-            detail: started
-                ? "The maintenance team has picked this up and started the repair."
-                : "Waiting for the Estate Manager to review and assign the repair.",
-            icon: started ? "construct" : "time-outline",
-            state: done ? "done" : started ? "current" : "upcoming",
-            date: started && !done ? formatDate(updatedAt) : undefined,
-            color: started ? Colors.primary : Colors.warning,
+            label: "In progress",
+            detail:
+                at >= 3
+                    ? "The maintenance team picked this up and started the repair."
+                    : "Work starts once the estimate is approved.",
+            icon: "construct",
+            state: stateOf(3),
+            color: Colors.primary,
+        },
+        {
+            key: "work_done",
+            label: "Work done",
+            detail:
+                at >= 4
+                    ? "The repair work is finished."
+                    : "The Estate Manager marks the work done when the repair is finished.",
+            icon: "hammer",
+            state: stateOf(4),
+            date: at >= 4 ? formatDate(c.workDoneAt) : undefined,
+            color: Colors.money,
         },
         {
             key: "resolved",
             label: "Resolved",
-            detail: done
-                ? "The repair is complete. You were notified by email and in the app."
-                : "You'll get a notification here as soon as the repair is finished.",
+            detail:
+                effective === "resolved"
+                    ? "The complaint is closed out. Everyone involved was notified."
+                    : "You'll get a notification here as soon as it's resolved.",
             icon: "checkmark",
-            state: done ? "done" : "upcoming",
-            date: done ? formatDate(resolvedAt) : undefined,
+            state: effective === "resolved" ? "done" : "upcoming",
+            date: effective === "resolved" ? formatDate(c.resolvedAt) : undefined,
             color: Colors.success,
         },
     ];
+
+    if (onHold) {
+        const holdStep: Step = {
+            key: "on_hold",
+            label: "On hold",
+            detail: "The Estate Manager has paused this complaint for now.",
+            icon: "pause",
+            state: "current",
+            date: formatDate(c.updatedAt),
+            color: Colors.textSecondary,
+            note: c.holdReason
+                ? { label: "Reason for hold", text: c.holdReason, tone: "neutral" }
+                : undefined,
+        };
+        const firstUpcoming = steps.findIndex((s) => s.state === "upcoming");
+        steps.splice(firstUpcoming === -1 ? steps.length : firstUpcoming, 0, holdStep);
+    }
+
+    return steps;
 }
 
 const styles = StyleSheet.create({
@@ -290,6 +364,13 @@ const styles = StyleSheet.create({
         color: Colors.errorDark,
         textTransform: "uppercase",
         letterSpacing: 0.5,
+    },
+    holdBox: {
+        backgroundColor: Colors.borderLight,
+        borderColor: Colors.border,
+    },
+    holdText: {
+        color: Colors.textBody,
     },
     reasonText: {
         fontSize: 12.5,

@@ -8,6 +8,7 @@ import { ComplaintCard } from "@/components/ComplaintCard";
 import { Colors, Radius, inr } from "@/constants/theme";
 import {
     ChipGroup,
+    Credit,
     EmptyState,
     SearchBar,
     TAB_BAR_CLEARANCE,
@@ -16,9 +17,13 @@ import {
 
 const STATUS_FILTERS = [
     { key: "all", label: "All" },
-    { key: "pending", label: "Pending" },
+    { key: "pending", label: "Raised" },
+    { key: "awaiting_approval", label: "Awaiting approval" },
+    { key: "approved", label: "Approved" },
     { key: "in_progress", label: "In progress" },
+    { key: "work_done", label: "Work done" },
     { key: "resolved", label: "Resolved" },
+    { key: "on_hold", label: "On hold" },
 ] as const;
 
 export default function AdminComplaintsScreen() {
@@ -91,6 +96,7 @@ export default function AdminComplaintsScreen() {
             <FlatList
                 data={visible}
                 keyExtractor={(item) => item._id}
+                ListFooterComponent={<Credit />}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"

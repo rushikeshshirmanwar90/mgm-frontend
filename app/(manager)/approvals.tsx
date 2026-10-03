@@ -15,6 +15,7 @@ import { Colors, Radius, Shadow } from "@/constants/theme";
 import {
     Banner,
     Button,
+    Credit,
     EmptyState,
     TAB_BAR_CLEARANCE,
     useHideTabBarOnScroll,
@@ -96,6 +97,7 @@ export default function StaffApprovalsScreen() {
             <FlatList
                 data={pendingUsers}
                 keyExtractor={(item) => item._id || item.id}
+                ListFooterComponent={<Credit />}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 onScroll={onScroll}

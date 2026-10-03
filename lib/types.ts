@@ -1,4 +1,4 @@
-export type UserRole = "staff" | "manager" | "admin";
+export type UserRole = "staff" | "manager" | "director" | "admin";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -40,7 +40,25 @@ export interface Room {
     name?: string;
 }
 
+export type ComplaintStatus =
+    | "pending"
+    | "awaiting_approval"
+    | "approved"
+    | "in_progress"
+    | "work_done"
+    | "resolved"
+    | "on_hold"
+    | "rejected";
+
+export interface CostItem {
+    key: string;
+    amount: number;
+}
+
 export interface CostDetail {
+    /** Itemised expenditure; absent on complaints costed before itemisation. */
+    items?: CostItem[];
+    miscDescription?: string;
     laborCost: number;
     materialCost: number;
     otherCost: number;
@@ -62,12 +80,28 @@ export interface Complaint {
     roomId?: Room | string;
     locationType: "classroom" | "washroom" | "lab" | "office" | "library" | "corridor" | "other";
     photos: string[];
-    status: "pending" | "in_progress" | "resolved" | "rejected";
+    status: ComplaintStatus;
     priority: "low" | "medium" | "high" | "critical";
+    category?: string;
+    /** The manager's own wording when `category` is "other". */
+    categoryOther?: string;
+    /** Money fields below are stripped by the server for staff. */
+    estimatedBudget?: number;
+    estimateNotes?: string;
+    estimatedBy?: User | string;
+    estimatedAt?: string;
+    approvedBy?: User | string;
+    approvedAt?: string;
+    returnReason?: string;
+    returnedBy?: User | string;
+    returnedAt?: string;
+    heldFrom?: ComplaintStatus;
+    workDoneAt?: string;
     assignedTo?: User | string;
     costDetails?: CostDetail;
     resolvedAt?: string;
     rejectionReason?: string;
+    holdReason?: string;
     createdAt: string;
     updatedAt: string;
 }

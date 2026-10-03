@@ -11,6 +11,7 @@ import {
 import { Colors, Radius, Shadow, inr } from "@/constants/theme";
 import {
     ChipGroup,
+    Credit,
     ProgressBar,
     Screen,
     SectionTitle,
@@ -100,9 +101,19 @@ export default function AdminReportsScreen() {
     }, [complaints]);
 
     const statusCounts = useMemo(() => {
-        const counts = { pending: 0, in_progress: 0, resolved: 0, rejected: 0 };
+        // The finer workflow stages fold into four tiles: not started yet
+        // (including waiting on the Director), being worked on, resolved, held.
+        const counts = { pending: 0, on_hold: 0, in_progress: 0, resolved: 0 };
         for (const c of complaints) {
-            if (c.status in counts) counts[c.status as keyof typeof counts] += 1;
+            if (c.status === "pending" || c.status === "awaiting_approval" || c.status === "approved") {
+                counts.pending += 1;
+            } else if (c.status === "in_progress" || c.status === "work_done") {
+                counts.in_progress += 1;
+            } else if (c.status === "resolved") {
+                counts.resolved += 1;
+            } else if (c.status === "on_hold") {
+                counts.on_hold += 1;
+            }
         }
         return counts;
     }, [complaints]);
@@ -248,7 +259,7 @@ export default function AdminReportsScreen() {
                     icon="time-outline"
                     color={Colors.warning}
                     value={statusCounts.pending}
-                    label="Pending"
+                    label="Not started"
                     style={styles.statusCard}
                 />
                 <StatCard
@@ -266,10 +277,10 @@ export default function AdminReportsScreen() {
                     style={styles.statusCard}
                 />
                 <StatCard
-                    icon="close-circle-outline"
-                    color={Colors.error}
-                    value={statusCounts.rejected}
-                    label="Rejected"
+                    icon="pause-circle-outline"
+                    color={Colors.textSecondary}
+                    value={statusCounts.on_hold}
+                    label="On hold"
                     style={styles.statusCard}
                 />
             </View>
@@ -352,6 +363,8 @@ export default function AdminReportsScreen() {
                     Bar height = cost recorded that month · bottom number = complaints raised
                 </Text>
             </View>
+
+            <Credit />
         </Screen>
     );
 }
